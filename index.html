@@ -907,27 +907,63 @@
     const loadVoices = () => { ttsVoices = speechSynthesis.getVoices(); };
     loadVoices();
     speechSynthesis.onvoiceschanged = loadVoices;
+
+    // Chrome a veces "pausa" el motor de voz tras ~15s de inactividad y la
+    // siguiente reproducción falla o se queda en silencio. Esto lo mantiene activo.
+    setInterval(() => {
+      if (speechSynthesis.speaking && !speechSynthesis.paused) {
+        speechSynthesis.pause();
+        speechSynthesis.resume();
+      }
+    }, 10000);
   }
 
   function pickVoice(lang) {
     if (!ttsVoices.length) return null;
     return ttsVoices.find(v => v.lang === lang)
       || ttsVoices.find(v => v.lang.toLowerCase().startsWith(lang.split('-')[0].toLowerCase()))
+      || ttsVoices.find(v => v.lang.toLowerCase().startsWith('es'))
+      || ttsVoices[0]
       || null;
   }
 
+  let speakPending = false;
   function speak(text) {
     if (!text || !text.trim()) { showToast('Escribe algo primero'); return; }
     if (!('speechSynthesis' in window)) { showToast('⚠️ Tu navegador no soporta voz'); return; }
+
     speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text.trim());
-    const lang = document.getElementById('langSelect').value;
-    utterance.lang = lang;
-    const voice = pickVoice(lang);
-    if (voice) utterance.voice = voice;
-    utterance.rate = 1;
-    utterance.onerror = () => showToast('⚠️ No se pudo reproducir la voz');
-    speechSynthesis.speak(utterance);
+    speakPending = true;
+
+    // Pequeña pausa tras cancel(): evita que el motor de Android se trabe
+    // si se reproduce una frase justo encima de otra.
+    setTimeout(() => {
+      if (!speakPending) return; // se canceló de nuevo antes de llegar aquí
+      speakPending = false;
+
+      const utterance = new SpeechSynthesisUtterance(text.trim());
+      const lang = document.getElementById('langSelect').value;
+      utterance.lang = lang;
+      const voice = pickVoice(lang);
+      if (voice) utterance.voice = voice;
+      utterance.rate = 1;
+
+      utterance.onerror = (e) => {
+        // 'canceled' e 'interrupted' ocurren cuando se reemplaza la frase a propósito; no son errores reales
+        if (e.error === 'canceled' || e.error === 'interrupted') return;
+        if (e.error === 'language-unavailable' || e.error === 'voice-unavailable') {
+          showToast('⚠️ No hay voz instalada para este idioma en tu teléfono');
+        } else if (e.error === 'synthesis-failed' || e.error === 'synthesis-unavailable') {
+          showToast('⚠️ El motor de voz del teléfono falló — intenta de nuevo');
+        } else if (e.error === 'not-allowed') {
+          showToast('⚠️ El navegador bloqueó la voz — toca la pantalla e intenta de nuevo');
+        } else {
+          showToast('⚠️ Error de voz: ' + e.error);
+        }
+      };
+
+      speechSynthesis.speak(utterance);
+    }, 120);
   }
 
   function speakCurrentText() {
@@ -940,6 +976,7 @@
   }
 
   function stopSpeaking() {
+    speakPending = false;
     if ('speechSynthesis' in window) speechSynthesis.cancel();
   }
 
