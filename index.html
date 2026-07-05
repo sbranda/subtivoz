@@ -214,6 +214,44 @@
 
   .btn-stop-speak { background: linear-gradient(135deg, var(--danger), #dc2626); color: #fff; }
 
+  /* ── SOUND DETECTION MODE ── */
+  .sound-area { flex: 1; padding: 16px; display: flex; flex-direction: column; min-height: 0; gap: 14px; }
+  .sound-status {
+    text-align: center; font-size: 12px; color: var(--muted);
+    font-family: 'Space Mono', monospace; flex-shrink: 0;
+  }
+  .sound-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0;
+  }
+  .sound-card {
+    background: rgba(22,22,31,0.75); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    transition: all 0.3s ease; backdrop-filter: blur(10px);
+  }
+  .sound-card .sound-icon { font-size: 34px; opacity: 0.4; transition: all 0.3s ease; }
+  .sound-card .sound-name { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; }
+  .sound-card.sound-active {
+    border-color: var(--accent); background: rgba(0,229,255,0.1);
+    animation: soundPulse 0.6s ease-in-out 2;
+  }
+  .sound-card.sound-active .sound-icon { opacity: 1; }
+  .sound-card.sound-active .sound-name { color: var(--accent); }
+  @keyframes soundPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
+  .sound-history {
+    flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;
+    display: flex; flex-direction: column; gap: 6px; min-height: 0;
+  }
+  .sound-history::-webkit-scrollbar { display: none; }
+  .sound-history-line {
+    font-size: 13px; padding: 8px 12px; background: rgba(22,22,31,0.5);
+    border-radius: 10px; border: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    animation: fadeIn 0.3s ease;
+  }
+  .sound-history-icon { font-size: 16px; }
+  .sound-history-time { margin-left: auto; color: var(--muted); font-family: 'Space Mono', monospace; font-size: 11px; }
+
   /* ── SUBTITLE AREA ── */
   .subtitle-area {
     flex: 1;
@@ -470,7 +508,8 @@
 
 <div class="mode-tabs">
   <button class="mode-tab active" id="tabListen" onclick="switchMode('listen')">🎙️ Subtítulos</button>
-  <button class="mode-tab" id="tabSpeak" onclick="switchMode('speak')">🗣️ Hablar por mí</button>
+  <button class="mode-tab" id="tabSpeak" onclick="switchMode('speak')">🗣️ Hablar</button>
+  <button class="mode-tab" id="tabSound" onclick="switchMode('sound')">🔔 Sonidos</button>
 </div>
 
 <div id="listenView">
@@ -562,6 +601,23 @@
       <button class="btn-secondary" onclick="stopSpeaking()">⏹️ Detener</button>
       <button class="btn-secondary" onclick="clearSpeakInput()">🗑️ Limpiar</button>
     </div>
+  </div>
+</div>
+
+<div id="soundView" style="display:none; flex-direction:column; flex:1; min-height:0;">
+  <div class="sound-area">
+    <div class="sound-status" id="soundStatus">Toca "Iniciar Detección" para activar</div>
+    <div class="sound-grid">
+      <div class="sound-card" id="cardDoorbell"><div class="sound-icon">🔔</div><div class="sound-name">Timbre</div></div>
+      <div class="sound-card" id="cardSmoke"><div class="sound-icon">🚨</div><div class="sound-name">Alarma de humo</div></div>
+      <div class="sound-card" id="cardBaby"><div class="sound-icon">👶</div><div class="sound-name">Llanto de bebé</div></div>
+      <div class="sound-card" id="cardHorn"><div class="sound-icon">🚗</div><div class="sound-name">Bocina / claxon</div></div>
+    </div>
+    <div class="sound-history" id="soundHistory"></div>
+  </div>
+
+  <div class="controls">
+    <button class="main-btn btn-start" id="soundBtn" onclick="toggleSoundDetection()">🔔 Iniciar Detección</button>
   </div>
 </div>
 
@@ -879,26 +935,27 @@
     if (isListening) { stopRecognition(); setTimeout(startRecognition, 300); showToast('🌐 Idioma cambiado'); }
   });
 
-  // ── Mode switching (Subtítulos ↔ Hablar por mí)
+  // ── Mode switching (Subtítulos ↔ Hablar por mí ↔ Sonidos)
   function switchMode(mode) {
     const listenView = document.getElementById('listenView');
     const speakView = document.getElementById('speakView');
+    const soundView = document.getElementById('soundView');
     const tabListen = document.getElementById('tabListen');
     const tabSpeak = document.getElementById('tabSpeak');
+    const tabSound = document.getElementById('tabSound');
 
-    if (mode === 'speak') {
-      if (isListening) stopRecognition();
-      listenView.style.display = 'none';
-      speakView.style.display = 'flex';
-      tabListen.classList.remove('active');
-      tabSpeak.classList.add('active');
-      document.getElementById('speakInput').focus();
-    } else {
-      speakView.style.display = 'none';
-      listenView.style.display = 'flex';
-      tabSpeak.classList.remove('active');
-      tabListen.classList.add('active');
-    }
+    if (isListening && mode !== 'listen') stopRecognition();
+    if (isSoundDetecting && mode !== 'sound') stopSoundDetection();
+
+    listenView.style.display = mode === 'listen' ? 'flex' : 'none';
+    speakView.style.display = mode === 'speak' ? 'flex' : 'none';
+    soundView.style.display = mode === 'sound' ? 'flex' : 'none';
+
+    tabListen.classList.toggle('active', mode === 'listen');
+    tabSpeak.classList.toggle('active', mode === 'speak');
+    tabSound.classList.toggle('active', mode === 'sound');
+
+    if (mode === 'speak') document.getElementById('speakInput').focus();
   }
 
   // ── Text-to-speech
@@ -982,6 +1039,180 @@
 
   function clearSpeakInput() {
     document.getElementById('speakInput').value = '';
+  }
+
+  // ── Sound pattern detection (YAMNet via TensorFlow.js)
+  // Índices verificados contra yamnet_class_map.csv (521 clases de AudioSet)
+  const SOUND_CLASSES = {
+    Doorbell: { indices: [349, 350], icon: '🔔', label: 'Timbre de puerta' },   // Doorbell, Ding-dong
+    Smoke:    { indices: [393, 394], icon: '🚨', label: 'Alarma de humo' },      // Smoke detector/alarm, Fire alarm
+    Baby:     { indices: [20, 19],   icon: '👶', label: 'Llanto de bebé' },      // Baby cry/infant cry, Crying/sobbing
+    Horn:     { indices: [302, 102, 303], icon: '🚗', label: 'Bocina / claxon' } // Vehicle horn, Honk, Toot
+  };
+  const SOUND_THRESHOLD = 0.35;
+  const SOUND_COOLDOWN_MS = 4000;
+
+  let soundModel = null;
+  let soundAudioCtx = null;
+  let soundStream = null;
+  let soundProcessor = null;
+  let soundSource = null;
+  let isSoundDetecting = false;
+  let soundBufferQueue = [];
+  let soundBufferedSamples = 0;
+  let soundLastTrigger = {};
+
+  async function ensureTfLoaded() {
+    if (window.tf) return;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar TensorFlow.js (revisa tu conexión)'));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensureSoundModel() {
+    if (soundModel) return soundModel;
+    await ensureTfLoaded();
+    soundModel = await tf.loadGraphModel('https://tfhub.dev/google/tfjs-model/yamnet/tfjs/1', { fromTFHub: true });
+    return soundModel;
+  }
+
+  function resampleTo16k(buffer, origRate) {
+    if (origRate === 16000) return buffer;
+    const ratio = origRate / 16000;
+    const newLen = Math.round(buffer.length / ratio);
+    const out = new Float32Array(newLen);
+    for (let i = 0; i < newLen; i++) {
+      const idx = i * ratio;
+      const lo = Math.floor(idx);
+      const hi = Math.min(lo + 1, buffer.length - 1);
+      const frac = idx - lo;
+      out[i] = buffer[lo] * (1 - frac) + buffer[hi] * frac;
+    }
+    return out;
+  }
+
+  async function toggleSoundDetection() {
+    if (isSoundDetecting) stopSoundDetection();
+    else await startSoundDetection();
+  }
+
+  async function startSoundDetection() {
+    const btn = document.getElementById('soundBtn');
+    const statusEl = document.getElementById('soundStatus');
+    btn.disabled = true;
+    try {
+      statusEl.textContent = '⏳ Cargando modelo de IA (puede tardar unos segundos la primera vez)...';
+      await ensureSoundModel();
+
+      soundStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      soundAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      soundSource = soundAudioCtx.createMediaStreamSource(soundStream);
+      soundProcessor = soundAudioCtx.createScriptProcessor(4096, 1, 1);
+      soundBufferQueue = [];
+      soundBufferedSamples = 0;
+
+      soundProcessor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        soundBufferQueue.push(new Float32Array(input));
+        soundBufferedSamples += input.length;
+        if (soundBufferedSamples >= soundAudioCtx.sampleRate) {
+          const merged = new Float32Array(soundBufferedSamples);
+          let offset = 0;
+          for (const chunk of soundBufferQueue) { merged.set(chunk, offset); offset += chunk.length; }
+          soundBufferQueue = [];
+          soundBufferedSamples = 0;
+          classifySoundChunk(merged, soundAudioCtx.sampleRate);
+        }
+      };
+
+      // Nodo de ganancia en 0: permite que onaudioprocess funcione sin que
+      // el micrófono se escuche por los parlantes (evita eco/feedback).
+      const silentGain = soundAudioCtx.createGain();
+      silentGain.gain.value = 0;
+      soundSource.connect(soundProcessor);
+      soundProcessor.connect(silentGain);
+      silentGain.connect(soundAudioCtx.destination);
+
+      isSoundDetecting = true;
+      btn.disabled = false;
+      btn.className = 'main-btn btn-stop';
+      btn.textContent = '⏹️ Detener Detección';
+      statusEl.textContent = '🎧 Escuchando sonidos...';
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+      if (err.name === 'NotAllowedError') {
+        statusEl.textContent = '⛔ Permiso de micrófono denegado';
+      } else {
+        statusEl.textContent = '⚠️ ' + err.message;
+      }
+    }
+  }
+
+  function stopSoundDetection() {
+    isSoundDetecting = false;
+    if (soundProcessor) { soundProcessor.onaudioprocess = null; soundProcessor.disconnect(); }
+    if (soundSource) soundSource.disconnect();
+    if (soundStream) soundStream.getTracks().forEach(t => t.stop());
+    if (soundAudioCtx) soundAudioCtx.close().catch(() => {});
+    soundProcessor = null; soundSource = null; soundStream = null; soundAudioCtx = null;
+    const btn = document.getElementById('soundBtn');
+    btn.className = 'main-btn btn-start';
+    btn.textContent = '🔔 Iniciar Detección';
+    document.getElementById('soundStatus').textContent = 'Toca "Iniciar Detección" para activar';
+  }
+
+  async function classifySoundChunk(buffer, origRate) {
+    if (!soundModel) return;
+    let waveformTensor, result;
+    try {
+      const resampled = resampleTo16k(buffer, origRate);
+      waveformTensor = tf.tensor1d(resampled);
+      result = soundModel.predict(waveformTensor);
+      const scoresTensor = Array.isArray(result) ? result[0] : result;
+      const scores = await scoresTensor.array(); // [frames, 521]
+      const numFrames = scores.length;
+      const numClasses = scores[0].length;
+      const avg = new Array(numClasses).fill(0);
+      for (const frame of scores) for (let i = 0; i < numClasses; i++) avg[i] += frame[i] / numFrames;
+
+      for (const [cat, info] of Object.entries(SOUND_CLASSES)) {
+        const score = Math.max(...info.indices.map(i => avg[i] || 0));
+        if (score >= SOUND_THRESHOLD) {
+          const now = Date.now();
+          if (!soundLastTrigger[cat] || now - soundLastTrigger[cat] > SOUND_COOLDOWN_MS) {
+            soundLastTrigger[cat] = now;
+            triggerSoundAlert(cat, info);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error de clasificación de sonido:', err);
+    } finally {
+      if (waveformTensor) waveformTensor.dispose();
+      if (result) (Array.isArray(result) ? result : [result]).forEach(t => t.dispose());
+    }
+  }
+
+  function triggerSoundAlert(cat, info) {
+    const card = document.getElementById('card' + cat);
+    if (card) {
+      card.classList.add('sound-active');
+      setTimeout(() => card.classList.remove('sound-active'), 2500);
+    }
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+    const history = document.getElementById('soundHistory');
+    const line = document.createElement('div');
+    line.className = 'sound-history-line';
+    const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    line.innerHTML = `<span class="sound-history-icon">${info.icon}</span> ${info.label} <span class="sound-history-time">${time}</span>`;
+    history.prepend(line);
+    while (history.children.length > 20) history.removeChild(history.lastChild);
   }
 
   // Wake Lock
