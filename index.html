@@ -494,6 +494,14 @@
   // ── PWA: Register Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(console.error);
+
+    // Si se instala una versión nueva del Service Worker, recarga sola la página
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   }
 
   // ── PWA: Install prompt

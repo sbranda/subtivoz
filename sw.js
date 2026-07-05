@@ -1,4 +1,4 @@
-const CACHE_NAME = 'subtivoz-v1';
+const CACHE_NAME = 'subtivoz-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -21,8 +21,16 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network-first: siempre intenta traer la versión más nueva.
+// Si no hay conexión, usa la copia guardada en caché (modo offline).
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(response => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(e.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
