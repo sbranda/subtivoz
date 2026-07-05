@@ -216,6 +216,36 @@
   .wave-bar:nth-child(8){height:10px;animation-delay:0.35s}
   @keyframes waveAnim { 0%,100%{transform:scaleY(0.4);opacity:0.5} 50%{transform:scaleY(1);opacity:1} }
 
+  /* ── VOLUME METER ── */
+  .volume-meter {
+    display: none;
+    align-items: center; gap: 10px;
+    margin-bottom: 10px; flex-shrink: 0;
+  }
+  .volume-meter.active { display: flex; }
+  .volume-label {
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);
+    display: flex; align-items: center; gap: 5px; flex-shrink: 0; min-width: 64px;
+  }
+  #dbValue { color: var(--text); font-weight: 700; }
+  .volume-track {
+    position: relative; flex: 1; height: 10px; border-radius: 6px;
+    background: rgba(42,42,58,0.6); border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .volume-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #22c55e 0%, #22c55e 55%, #eab308 78%, #ef4444 100%);
+    transition: width 0.08s linear;
+  }
+  .volume-peak {
+    position: absolute; top: -1px; bottom: -1px; width: 2px;
+    background: #fff; left: 0%;
+    box-shadow: 0 0 4px rgba(255,255,255,0.8);
+    transition: left 0.08s linear;
+  }
+
   .subtitle-history {
     flex: 1; overflow-y: auto; scrollbar-width: none;
     -ms-overflow-style: none; display: flex; flex-direction: column;
@@ -381,6 +411,14 @@
         <div class="wave-bar"></div><div class="wave-bar"></div>
       </div>
 
+      <div class="volume-meter" id="volumeMeter">
+        <div class="volume-label">🔊 <span id="dbValue">-- dB</span></div>
+        <div class="volume-track">
+          <div class="volume-fill" id="volumeFill"></div>
+          <div class="volume-peak" id="volumePeak"></div>
+        </div>
+      </div>
+
       <div class="subtitle-history" id="subtitleHistory"></div>
 
       <div class="current-subtitle" id="currentSubtitle">
@@ -459,6 +497,14 @@
   let wordCount = 0;
   let currentFontSize = 28;
 
+  // ── Volume meter state
+  let audioCtx = null;
+  let analyser = null;
+  let micStream = null;
+  let meterRAF = null;
+  let peakLevel = 0;
+  const DB_FLOOR = -60; // anything quieter than this reads as 0%
+
   // Font slider
   const fontSlider = document.getElementById('fontSlider');
   const fontValueEl = document.getElementById('fontValue');
@@ -532,6 +578,65 @@
     return true;
   }
 
+  async function startVolumeMeter() {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(micStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.7;
+      source.connect(analyser);
+
+      peakLevel = 0;
+      document.getElementById('volumeMeter').classList.add('active');
+      meterLoop();
+    } catch (err) {
+      // No mic access for the meter (recognition may still work independently)
+      console.warn('No se pudo iniciar el medidor de volumen:', err);
+    }
+  }
+
+  function meterLoop() {
+    if (!analyser) return;
+    const data = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(data);
+
+    // RMS of the waveform, centered at 128
+    let sumSquares = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = (data[i] - 128) / 128;
+      sumSquares += v * v;
+    }
+    const rms = Math.sqrt(sumSquares / data.length);
+    const db = rms > 0 ? 20 * Math.log10(rms) : DB_FLOOR;
+    const dbClamped = Math.max(DB_FLOOR, Math.min(0, db));
+    const percent = ((dbClamped - DB_FLOOR) / -DB_FLOOR) * 100;
+
+    // Peak hold with slow decay
+    peakLevel = percent > peakLevel ? percent : Math.max(0, peakLevel - 0.8);
+
+    document.getElementById('volumeFill').style.width = percent + '%';
+    document.getElementById('volumePeak').style.left = peakLevel + '%';
+    document.getElementById('dbValue').textContent = Math.round(dbClamped) + ' dB';
+
+    meterRAF = requestAnimationFrame(meterLoop);
+  }
+
+  function stopVolumeMeter() {
+    if (meterRAF) cancelAnimationFrame(meterRAF);
+    meterRAF = null;
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+    if (audioCtx) audioCtx.close().catch(() => {});
+    audioCtx = null;
+    analyser = null;
+    document.getElementById('volumeMeter').classList.remove('active');
+    document.getElementById('volumeFill').style.width = '0%';
+    document.getElementById('volumePeak').style.left = '0%';
+    document.getElementById('dbValue').textContent = '-- dB';
+  }
+
   function toggleRecognition() {
     isListening ? stopRecognition() : startRecognition();
   }
@@ -541,6 +646,7 @@
     if (!setupRecognition()) return;
     isListening = true;
     try { recognition.start(); } catch(e) { showToast('Error al iniciar micrófono'); isListening = false; return; }
+    startVolumeMeter();
     const btn = document.getElementById('mainBtn');
     btn.className = 'main-btn btn-stop';
     btn.textContent = '⏹️ Detener';
@@ -549,6 +655,7 @@
   function stopRecognition() {
     isListening = false;
     if (recognition) { try { recognition.stop(); } catch(e){} }
+    stopVolumeMeter();
     clearInterval(timerInterval);
     setStatus('idle');
     document.getElementById('waveform').classList.remove('active');
