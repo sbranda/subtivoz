@@ -342,6 +342,7 @@
   .subtitle-scroll {
     flex: 1; overflow-y: auto; scrollbar-width: none;
     -ms-overflow-style: none; min-height: 0;
+    scroll-behavior: smooth;
   }
   .subtitle-scroll::-webkit-scrollbar { display: none; }
 
@@ -719,9 +720,18 @@
     currentFontSize = parseInt(fontSlider.value);
     fontValueEl.textContent = currentFontSize + 'px';
     currentSubtitleEl.style.fontSize = currentFontSize + 'px';
-    const historyFontSize = Math.max(13, currentFontSize * 0.52) + 'px';
+    const historyFontSize = currentFontSize + 'px';
     document.querySelectorAll('.history-line').forEach(el => el.style.fontSize = historyFontSize);
   });
+
+  function scrollSubtitlesToBottom() {
+    if (scrollSubtitlesToBottom._t) return;
+    scrollSubtitlesToBottom._t = setTimeout(() => {
+      scrollSubtitlesToBottom._t = null;
+      const box = document.getElementById('subtitleScroll');
+      box.scrollTop = box.scrollHeight;
+    }, 150);
+  }
 
   function setupRecognition() {
     if (!SpeechRecognition) {
@@ -765,10 +775,7 @@
       }
       document.getElementById('finalText').textContent = finalTranscript;
       document.getElementById('interimText').textContent = interim;
-      requestAnimationFrame(() => {
-        const box = document.getElementById('subtitleScroll');
-        box.scrollTop = box.scrollHeight;
-      });
+      scrollSubtitlesToBottom();
     };
 
     recognition.onerror = (e) => {
@@ -883,12 +890,9 @@
     const line = document.createElement('div');
     line.className = 'history-line';
     line.textContent = text.trim();
-    line.style.fontSize = Math.max(13, currentFontSize * 0.52) + 'px';
+    line.style.fontSize = currentFontSize + 'px';
     history.appendChild(line);
-    requestAnimationFrame(() => {
-      const scrollBox = document.getElementById('subtitleScroll');
-      scrollBox.scrollTop = scrollBox.scrollHeight;
-    });
+    scrollSubtitlesToBottom();
     document.getElementById('placeholder').style.display = 'none';
   }
 
