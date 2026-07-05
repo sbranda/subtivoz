@@ -246,12 +246,16 @@
     transition: left 0.08s linear;
   }
 
-  .subtitle-history {
+  .subtitle-scroll {
     flex: 1; overflow-y: auto; scrollbar-width: none;
     -ms-overflow-style: none; display: flex; flex-direction: column;
-    justify-content: flex-end; gap: 4px; min-height: 0;
+    justify-content: flex-end; min-height: 0;
   }
-  .subtitle-history::-webkit-scrollbar { display: none; }
+  .subtitle-scroll::-webkit-scrollbar { display: none; }
+
+  .subtitle-history {
+    display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
+  }
 
   .history-line {
     color: rgba(240,240,248,0.3); font-weight: 400; line-height: 1.4;
@@ -406,7 +410,7 @@
   <select class="lang-select" id="langSelect">
     <option value="es-ES">🇪🇸 Español (España)</option>
     <option value="es-MX">🇲🇽 Español (México)</option>
-    <option value="es-AR">🇦🇷 Español (Argentina)</option>
+    <option value="es-AR" selected>🇦🇷 Español (Argentina)</option>
     <option value="es-CO">🇨🇴 Español (Colombia)</option>
     <option value="es-US">🇺🇸 Español (EE.UU.)</option>
     <option value="en-US">🇺🇸 English (US)</option>
@@ -439,10 +443,12 @@
         </div>
       </div>
 
-      <div class="subtitle-history" id="subtitleHistory"></div>
+      <div class="subtitle-scroll" id="subtitleScroll">
+        <div class="subtitle-history" id="subtitleHistory"></div>
 
-      <div class="current-subtitle" id="currentSubtitle">
-        <span id="finalText"></span><span class="interim-text" id="interimText"></span><span class="cursor-blink" id="cursor"></span>
+        <div class="current-subtitle" id="currentSubtitle">
+          <span id="finalText"></span><span class="interim-text" id="interimText"></span><span class="cursor-blink" id="cursor"></span>
+        </div>
       </div>
 
       <div class="session-stats" id="sessionStats">
@@ -600,7 +606,7 @@
       }
       document.getElementById('finalText').textContent = finalTranscript;
       document.getElementById('interimText').textContent = interim;
-      document.getElementById('subtitleHistory').scrollTop = 9999;
+      document.getElementById('subtitleScroll').scrollTop = document.getElementById('subtitleScroll').scrollHeight;
     };
 
     recognition.onerror = (e) => {
@@ -717,7 +723,8 @@
     line.textContent = text.trim();
     line.style.fontSize = Math.max(13, currentFontSize * 0.52) + 'px';
     history.appendChild(line);
-    history.scrollTop = history.scrollHeight;
+    const scrollBox = document.getElementById('subtitleScroll');
+    scrollBox.scrollTop = scrollBox.scrollHeight;
     document.getElementById('placeholder').style.display = 'none';
   }
 
