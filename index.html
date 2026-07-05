@@ -252,6 +252,13 @@
   .sound-history-icon { font-size: 16px; }
   .sound-history-time { margin-left: auto; color: var(--muted); font-family: 'Space Mono', monospace; font-size: 11px; }
 
+  .loud-flash {
+    position: fixed; inset: 0; background: rgba(0,229,255,0.15);
+    pointer-events: none; z-index: 400; opacity: 0;
+  }
+  .loud-flash.show { animation: loudFlash 0.5s ease-out; }
+  @keyframes loudFlash { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+
   /* ── SUBTITLE AREA ── */
   .subtitle-area {
     flex: 1;
@@ -617,9 +624,20 @@
   </div>
 
   <div class="controls">
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">📳 Vibrar con sonidos fuertes/repentinos
+        <span class="meter-toggle-hint">Aplausos, portazos, gritos — vibra al instante, sin esperar a identificar el sonido</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="loudSoundToggle" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
     <button class="main-btn btn-start" id="soundBtn" onclick="toggleSoundDetection()">🔔 Iniciar Detección</button>
   </div>
 </div>
+
+<div class="loud-flash" id="loudFlash"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -1062,6 +1080,67 @@
   let soundBufferedSamples = 0;
   let soundLastTrigger = {};
 
+  // ── Sonido fuerte / repentino (detección instantánea por volumen, sin esperar a la IA)
+  let loudSoundEnabled = true;
+  let loudLevelHistory = [];
+  let lastLoudTrigger = 0;
+  let lastAnyTrigger = 0; // usado para no vibrar dos veces por el mismo evento (spike + clasificación IA)
+  const LOUD_HISTORY_SIZE = 15;
+  const LOUD_COOLDOWN_MS = 1500;
+  const LOUD_ABS_THRESHOLD_DB = -12; // muy fuerte en términos absolutos
+  const LOUD_SPIKE_RATIO = 3.5;      // cuánto más fuerte que el "ambiente" reciente
+  const LOUD_MIN_RMS = 0.02;         // piso para no disparar con silencio
+
+  document.getElementById('loudSoundToggle').addEventListener('change', (e) => {
+    loudSoundEnabled = e.target.checked;
+  });
+
+  function checkLoudSpike(chunk) {
+    let sumSquares = 0;
+    for (let i = 0; i < chunk.length; i++) sumSquares += chunk[i] * chunk[i];
+    const rms = Math.sqrt(sumSquares / chunk.length);
+    const db = rms > 0 ? 20 * Math.log10(rms) : -100;
+
+    const baseline = loudLevelHistory.length
+      ? loudLevelHistory.reduce((a, b) => a + b, 0) / loudLevelHistory.length
+      : 0;
+
+    const isLoud = db > LOUD_ABS_THRESHOLD_DB;
+    const isSpike = rms > LOUD_MIN_RMS && baseline > 0 && rms > baseline * LOUD_SPIKE_RATIO;
+
+    if ((isLoud || isSpike) && loudSoundEnabled) {
+      const now = Date.now();
+      if (now - lastLoudTrigger > LOUD_COOLDOWN_MS) {
+        lastLoudTrigger = now;
+        triggerLoudSoundAlert();
+      }
+    }
+
+    // El pico actual no entra en su propio "ambiente" de referencia
+    loudLevelHistory.push(rms);
+    if (loudLevelHistory.length > LOUD_HISTORY_SIZE) loudLevelHistory.shift();
+  }
+
+  function triggerLoudSoundAlert() {
+    const now = Date.now();
+    if (now - lastAnyTrigger < 1200) return; // ya vibró por una detección específica hace un instante
+    lastAnyTrigger = now;
+
+    if (navigator.vibrate) navigator.vibrate(300);
+    const flash = document.getElementById('loudFlash');
+    flash.classList.remove('show');
+    void flash.offsetWidth; // reinicia la animación si se repite rápido
+    flash.classList.add('show');
+
+    const history = document.getElementById('soundHistory');
+    const line = document.createElement('div');
+    line.className = 'sound-history-line';
+    const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    line.innerHTML = `<span class="sound-history-icon">⚡</span> Sonido fuerte o repentino <span class="sound-history-time">${time}</span>`;
+    history.prepend(line);
+    while (history.children.length > 20) history.removeChild(history.lastChild);
+  }
+
   async function ensureTfLoaded() {
     if (window.tf) return;
     await new Promise((resolve, reject) => {
@@ -1114,9 +1193,12 @@
       soundProcessor = soundAudioCtx.createScriptProcessor(4096, 1, 1);
       soundBufferQueue = [];
       soundBufferedSamples = 0;
+      loudLevelHistory = [];
+      lastLoudTrigger = 0;
 
       soundProcessor.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
+        checkLoudSpike(input);
         soundBufferQueue.push(new Float32Array(input));
         soundBufferedSamples += input.length;
         if (soundBufferedSamples >= soundAudioCtx.sampleRate) {
@@ -1199,6 +1281,7 @@
   }
 
   function triggerSoundAlert(cat, info) {
+    lastAnyTrigger = Date.now();
     const card = document.getElementById('card' + cat);
     if (card) {
       card.classList.add('sound-active');
