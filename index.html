@@ -166,6 +166,54 @@
   }
   .lang-select:focus { border-color: var(--accent); }
 
+  /* ── MODE TABS ── */
+  .mode-tabs {
+    display: flex; gap: 6px; padding: 10px 16px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    flex-shrink: 0; position: relative; z-index: 10;
+  }
+  .mode-tab {
+    flex: 1; padding: 10px 8px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--muted);
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s ease; touch-action: manipulation;
+  }
+  .mode-tab.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000; border-color: transparent;
+  }
+
+  #listenView {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+  }
+  main {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+  }
+
+  /* ── SPEAK (TEXT-TO-SPEECH) MODE ── */
+  .speak-area { flex: 1; padding: 16px; display: flex; flex-direction: column; min-height: 0; }
+  .speak-textarea {
+    flex: 1; width: 100%; resize: none;
+    background: rgba(22,22,31,0.75); border: 1px solid var(--border); border-radius: 18px;
+    padding: 18px; color: var(--text); font-family: 'Syne', sans-serif;
+    font-size: 22px; font-weight: 600; line-height: 1.4;
+    outline: none; backdrop-filter: blur(10px); min-height: 0;
+  }
+  .speak-textarea:focus { border-color: var(--accent); }
+  .speak-textarea::placeholder { color: var(--muted); font-weight: 400; }
+
+  .quick-phrases {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; flex-shrink: 0;
+  }
+  .quick-phrase-btn {
+    padding: 8px 14px; border-radius: 100px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 600; cursor: pointer; touch-action: manipulation;
+  }
+  .quick-phrase-btn:active { background: rgba(0,229,255,0.08); border-color: var(--accent); color: var(--accent); }
+
+  .btn-stop-speak { background: linear-gradient(135deg, var(--danger), #dc2626); color: #fff; }
+
   /* ── SUBTITLE AREA ── */
   .subtitle-area {
     flex: 1;
@@ -420,6 +468,12 @@
   </select>
 </div>
 
+<div class="mode-tabs">
+  <button class="mode-tab active" id="tabListen" onclick="switchMode('listen')">🎙️ Subtítulos</button>
+  <button class="mode-tab" id="tabSpeak" onclick="switchMode('speak')">🗣️ Hablar por mí</button>
+</div>
+
+<div id="listenView">
 <main>
   <div class="subtitle-area">
     <div class="subtitle-box">
@@ -484,6 +538,30 @@
     <button class="btn-secondary" onclick="copyText()">📋 Copiar</button>
     <button class="btn-secondary" onclick="toggleHighContrast()">🔆 Contraste</button>
     <button class="btn-secondary" onclick="shareText()">↗️ Compartir</button>
+  </div>
+</div>
+</div>
+
+<div id="speakView" style="display:none; flex-direction:column; flex:1; min-height:0;">
+  <div class="speak-area">
+    <textarea class="speak-textarea" id="speakInput" placeholder="Escribe aquí lo que quieres decir..."></textarea>
+    <div class="quick-phrases" id="quickPhrases">
+      <button class="quick-phrase-btn" onclick="quickSpeak('Un momento por favor')">Un momento por favor</button>
+      <button class="quick-phrase-btn" onclick="quickSpeak('¿Puede repetir, por favor?')">¿Puede repetir?</button>
+      <button class="quick-phrase-btn" onclick="quickSpeak('No escucho, hábleme despacio')">No escucho, hábleme despacio</button>
+      <button class="quick-phrase-btn" onclick="quickSpeak('Sí')">Sí</button>
+      <button class="quick-phrase-btn" onclick="quickSpeak('No')">No</button>
+      <button class="quick-phrase-btn" onclick="quickSpeak('Gracias')">Gracias</button>
+      <button class="quick-phrase-btn" onclick="quickSpeak('Necesito ayuda, por favor')">Necesito ayuda</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="main-btn btn-start" id="speakBtn" onclick="speakCurrentText()">🔊 Reproducir en voz alta</button>
+    <div class="secondary-btns">
+      <button class="btn-secondary" onclick="stopSpeaking()">⏹️ Detener</button>
+      <button class="btn-secondary" onclick="clearSpeakInput()">🗑️ Limpiar</button>
+    </div>
   </div>
 </div>
 
@@ -800,6 +878,74 @@
   document.getElementById('langSelect').addEventListener('change', () => {
     if (isListening) { stopRecognition(); setTimeout(startRecognition, 300); showToast('🌐 Idioma cambiado'); }
   });
+
+  // ── Mode switching (Subtítulos ↔ Hablar por mí)
+  function switchMode(mode) {
+    const listenView = document.getElementById('listenView');
+    const speakView = document.getElementById('speakView');
+    const tabListen = document.getElementById('tabListen');
+    const tabSpeak = document.getElementById('tabSpeak');
+
+    if (mode === 'speak') {
+      if (isListening) stopRecognition();
+      listenView.style.display = 'none';
+      speakView.style.display = 'flex';
+      tabListen.classList.remove('active');
+      tabSpeak.classList.add('active');
+      document.getElementById('speakInput').focus();
+    } else {
+      speakView.style.display = 'none';
+      listenView.style.display = 'flex';
+      tabSpeak.classList.remove('active');
+      tabListen.classList.add('active');
+    }
+  }
+
+  // ── Text-to-speech
+  let ttsVoices = [];
+  if ('speechSynthesis' in window) {
+    const loadVoices = () => { ttsVoices = speechSynthesis.getVoices(); };
+    loadVoices();
+    speechSynthesis.onvoiceschanged = loadVoices;
+  }
+
+  function pickVoice(lang) {
+    if (!ttsVoices.length) return null;
+    return ttsVoices.find(v => v.lang === lang)
+      || ttsVoices.find(v => v.lang.toLowerCase().startsWith(lang.split('-')[0].toLowerCase()))
+      || null;
+  }
+
+  function speak(text) {
+    if (!text || !text.trim()) { showToast('Escribe algo primero'); return; }
+    if (!('speechSynthesis' in window)) { showToast('⚠️ Tu navegador no soporta voz'); return; }
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text.trim());
+    const lang = document.getElementById('langSelect').value;
+    utterance.lang = lang;
+    const voice = pickVoice(lang);
+    if (voice) utterance.voice = voice;
+    utterance.rate = 1;
+    utterance.onerror = () => showToast('⚠️ No se pudo reproducir la voz');
+    speechSynthesis.speak(utterance);
+  }
+
+  function speakCurrentText() {
+    speak(document.getElementById('speakInput').value);
+  }
+
+  function quickSpeak(phrase) {
+    document.getElementById('speakInput').value = phrase;
+    speak(phrase);
+  }
+
+  function stopSpeaking() {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+
+  function clearSpeakInput() {
+    document.getElementById('speakInput').value = '';
+  }
 
   // Wake Lock
   if ('wakeLock' in navigator) {
