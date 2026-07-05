@@ -248,8 +248,7 @@
 
   .subtitle-scroll {
     flex: 1; overflow-y: auto; scrollbar-width: none;
-    -ms-overflow-style: none; display: flex; flex-direction: column;
-    justify-content: flex-end; min-height: 0;
+    -ms-overflow-style: none; min-height: 0;
   }
   .subtitle-scroll::-webkit-scrollbar { display: none; }
 
@@ -614,7 +613,10 @@
       }
       document.getElementById('finalText').textContent = finalTranscript;
       document.getElementById('interimText').textContent = interim;
-      document.getElementById('subtitleScroll').scrollTop = document.getElementById('subtitleScroll').scrollHeight;
+      requestAnimationFrame(() => {
+        const box = document.getElementById('subtitleScroll');
+        box.scrollTop = box.scrollHeight;
+      });
     };
 
     recognition.onerror = (e) => {
@@ -731,8 +733,10 @@
     line.textContent = text.trim();
     line.style.fontSize = Math.max(13, currentFontSize * 0.52) + 'px';
     history.appendChild(line);
-    const scrollBox = document.getElementById('subtitleScroll');
-    scrollBox.scrollTop = scrollBox.scrollHeight;
+    requestAnimationFrame(() => {
+      const scrollBox = document.getElementById('subtitleScroll');
+      scrollBox.scrollTop = scrollBox.scrollHeight;
+    });
     document.getElementById('placeholder').style.display = 'none';
   }
 
