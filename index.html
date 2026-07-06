@@ -2322,7 +2322,7 @@
     };
 
     chatRecognition.onend = () => {
-      if (isChatListening) {
+      if (isChatListening && !chatMicPausedForSpeech) {
         if (chatBuffer.trim()) { addChatBubble(chatBuffer.trim(), 'them'); chatBuffer = ''; }
         try { chatRecognition.start(); } catch (err) {}
       }
@@ -2345,9 +2345,34 @@
 
   function stopChatMic() {
     isChatListening = false;
+    chatMicPausedForSpeech = false;
     if (chatRecognition) { try { chatRecognition.stop(); } catch (e) {} }
     document.getElementById('chatMicBtn').classList.remove('listening');
     document.getElementById('chatStatus').textContent = '';
+  }
+
+  // Evita que el micrófono escuche y retranscriba la propia voz de la app (eco).
+  // Pausa el reconocimiento mientras habla, y lo reanuda apenas termina.
+  let chatMicPausedForSpeech = false;
+  function pauseChatMicForSpeech() {
+    if (!isChatListening) return;
+    chatMicPausedForSpeech = true;
+    document.getElementById('chatStatus').textContent = '🔇 Micrófono en pausa mientras habla...';
+    if (chatRecognition) { try { chatRecognition.stop(); } catch (e) {} }
+
+    // Espera un instante para que la voz realmente empiece antes de vigilar si ya terminó
+    setTimeout(() => {
+      const checkDone = setInterval(() => {
+        if (!speechSynthesis.speaking) {
+          clearInterval(checkDone);
+          chatMicPausedForSpeech = false;
+          if (isChatListening) {
+            try { chatRecognition.start(); } catch (e) {}
+            document.getElementById('chatStatus').textContent = '🎙️ Escuchando a la otra persona...';
+          }
+        }
+      }, 200);
+    }, 400);
   }
 
   function sendChatMessage() {
@@ -2355,6 +2380,7 @@
     const text = input.value.trim();
     if (!text) return;
     addChatBubble(text, 'me');
+    if (isChatListening) pauseChatMicForSpeech();
     speak(text);
     input.value = '';
   }
