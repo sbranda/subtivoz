@@ -183,9 +183,9 @@
     flex-shrink: 0; position: relative; z-index: 10;
   }
   .mode-tab {
-    flex: 1; padding: 10px 8px; border-radius: 10px; border: 1px solid var(--border);
+    flex: 1; padding: 10px 4px; border-radius: 10px; border: 1px solid var(--border);
     background: var(--card); color: var(--muted);
-    font-family: var(--font-main); font-size: 13px; font-weight: 700;
+    font-family: var(--font-main); font-size: 11px; font-weight: 700;
     cursor: pointer; transition: all 0.2s ease; touch-action: manipulation;
   }
   .mode-tab.active {
@@ -705,6 +705,56 @@
   }
   .history-session-actions button:active { border-color: var(--accent); color: var(--accent); }
 
+  /* ── CHAT CONVERSATION MODE ── */
+  #chatView { padding: 16px 16px 0; gap: 10px; }
+  .chat-messages {
+    flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;
+    display: flex; flex-direction: column; gap: 8px; min-height: 0;
+    -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+  }
+  .chat-messages::-webkit-scrollbar { display: none; }
+  .chat-empty {
+    text-align: center; color: var(--muted); font-size: 13px; line-height: 1.5;
+    padding: 40px 20px; margin: auto;
+  }
+  .chat-bubble {
+    max-width: 78%; padding: 10px 14px; border-radius: 16px;
+    font-size: 15px; line-height: 1.4; animation: fadeIn 0.25s ease;
+  }
+  .chat-bubble.them {
+    align-self: flex-start; background: var(--card); border: 1px solid var(--border);
+    color: var(--text); border-bottom-left-radius: 4px;
+  }
+  .chat-bubble.me {
+    align-self: flex-end; background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000; font-weight: 600; border-bottom-right-radius: 4px;
+  }
+  .chat-bubble-translation {
+    display: block; margin-top: 4px; font-size: 12px; font-style: italic; opacity: 0.8;
+  }
+  .chat-status {
+    text-align: center; font-size: 12px; color: var(--accent);
+    font-family: 'Space Mono', monospace; min-height: 16px; flex-shrink: 0;
+  }
+  .chat-input-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 0 calc(12px + var(--safe-bottom)); flex-shrink: 0;
+  }
+  #chatInput {
+    flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 100px;
+    padding: 12px 16px; color: var(--text); font-family: var(--font-main); font-size: 14px;
+    outline: none;
+  }
+  #chatInput:focus { border-color: var(--accent); }
+  #chatMicBtn, #chatSendBtn {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    border: none; cursor: pointer; touch-action: manipulation;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  #chatSendBtn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #000; }
+  #chatMicBtn { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+  #chatMicBtn.listening { background: var(--danger); color: #fff; border-color: transparent; animation: stopPulse 2s ease-in-out infinite; }
+
   /* ── CAMERA OVERLAY CAPTION MODE ── */
   #cameraView {
     position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden;
@@ -787,9 +837,10 @@
 </div>
 
 <div class="mode-tabs">
-  <button class="mode-tab active" id="tabListen" onclick="switchMode('listen')">🎙️ Subtítulos</button>
+  <button class="mode-tab active" id="tabListen" onclick="switchMode('listen')">🎙️ Subt.</button>
   <button class="mode-tab" id="tabSpeak" onclick="switchMode('speak')">🗣️ Hablar</button>
   <button class="mode-tab" id="tabSound" onclick="switchMode('sound')">🔔 Sonidos</button>
+  <button class="mode-tab" id="tabChat" onclick="switchMode('chat')">💬 Chat</button>
 </div>
 
 <div id="listenView">
@@ -1045,6 +1096,18 @@
       </label>
     </div>
     <button class="main-btn btn-start" id="soundBtn" onclick="toggleSoundDetection()">🔔 Iniciar Detección</button>
+  </div>
+</div>
+
+<div id="chatView" style="display:none; flex-direction:column; flex:1; min-height:0;">
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-empty" id="chatEmpty">💬 Tocá el micrófono para escuchar a la otra persona, o escribí tu respuesta abajo.</div>
+  </div>
+  <div class="chat-status" id="chatStatus"></div>
+  <div class="chat-input-row">
+    <button id="chatMicBtn" onclick="toggleChatMic()">🎙️</button>
+    <input type="text" id="chatInput" placeholder="Escribí tu respuesta...">
+    <button id="chatSendBtn" onclick="sendChatMessage()">➤</button>
   </div>
 </div>
 
@@ -2013,20 +2076,25 @@
     const listenView = document.getElementById('listenView');
     const speakView = document.getElementById('speakView');
     const soundView = document.getElementById('soundView');
+    const chatView = document.getElementById('chatView');
     const tabListen = document.getElementById('tabListen');
     const tabSpeak = document.getElementById('tabSpeak');
     const tabSound = document.getElementById('tabSound');
+    const tabChat = document.getElementById('tabChat');
 
     if (isListening && mode !== 'listen') stopRecognition();
     if (isSoundDetecting && mode !== 'sound') stopSoundDetection();
+    if (isChatListening && mode !== 'chat') stopChatMic();
 
     listenView.style.display = mode === 'listen' ? 'flex' : 'none';
     speakView.style.display = mode === 'speak' ? 'flex' : 'none';
     soundView.style.display = mode === 'sound' ? 'flex' : 'none';
+    chatView.style.display = mode === 'chat' ? 'flex' : 'none';
 
     tabListen.classList.toggle('active', mode === 'listen');
     tabSpeak.classList.toggle('active', mode === 'speak');
     tabSound.classList.toggle('active', mode === 'sound');
+    tabChat.classList.toggle('active', mode === 'chat');
 
     if (mode === 'speak') document.getElementById('speakInput').focus();
   }
@@ -2145,6 +2213,112 @@
   function clearSpeakInput() {
     document.getElementById('speakInput').value = '';
   }
+
+  // ── Modo Conversación (chat con burbujas + traducción)
+  let chatRecognition = null;
+  let isChatListening = false;
+
+  function addChatBubble(text, sender) {
+    if (!text.trim()) return;
+    const empty = document.getElementById('chatEmpty');
+    if (empty) empty.remove();
+
+    const messages = document.getElementById('chatMessages');
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble ' + sender;
+    bubble.textContent = text.trim();
+    messages.appendChild(bubble);
+
+    if (sender === 'them' && translationEnabled) {
+      const sourceLang = document.getElementById('langSelect').value.split('-')[0];
+      const targetLang = document.getElementById('translateTarget').value;
+      if (sourceLang !== targetLang) {
+        const transEl = document.createElement('span');
+        transEl.className = 'chat-bubble-translation';
+        transEl.textContent = '🌐 Traduciendo...';
+        bubble.appendChild(transEl);
+        translateLine(text.trim(), sourceLang, targetLang, transEl);
+      }
+    }
+
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function setupChatRecognition() {
+    if (!SpeechRecognition) {
+      showToast('⚠️ Usa Chrome en Android para reconocimiento de voz');
+      return false;
+    }
+    chatRecognition = new SpeechRecognition();
+    chatRecognition.continuous = true;
+    chatRecognition.interimResults = true;
+    chatRecognition.maxAlternatives = 1;
+    chatRecognition.lang = document.getElementById('langSelect').value;
+
+    let chatBuffer = '';
+
+    chatRecognition.onstart = () => {
+      document.getElementById('chatStatus').textContent = '🎙️ Escuchando a la otra persona...';
+    };
+
+    chatRecognition.onresult = (event) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          chatBuffer += event.results[i][0].transcript + ' ';
+          if (chatBuffer.length > 60) {
+            addChatBubble(chatBuffer.trim(), 'them');
+            chatBuffer = '';
+          }
+        }
+      }
+    };
+
+    chatRecognition.onerror = (e) => {
+      if (e.error === 'not-allowed') { showToast('⛔ Permiso de micrófono denegado'); stopChatMic(); }
+      else if (e.error === 'network') { showToast('📶 Sin conexión — verifica tu red'); stopChatMic(); }
+    };
+
+    chatRecognition.onend = () => {
+      if (isChatListening) {
+        if (chatBuffer.trim()) { addChatBubble(chatBuffer.trim(), 'them'); chatBuffer = ''; }
+        try { chatRecognition.start(); } catch (err) {}
+      }
+    };
+
+    return true;
+  }
+
+  function toggleChatMic() {
+    isChatListening ? stopChatMic() : startChatMic();
+  }
+
+  function startChatMic() {
+    if (chatRecognition) { try { chatRecognition.stop(); } catch (e) {} chatRecognition = null; }
+    if (!setupChatRecognition()) return;
+    isChatListening = true;
+    try { chatRecognition.start(); } catch (e) { showToast('Error al iniciar micrófono'); isChatListening = false; return; }
+    document.getElementById('chatMicBtn').classList.add('listening');
+  }
+
+  function stopChatMic() {
+    isChatListening = false;
+    if (chatRecognition) { try { chatRecognition.stop(); } catch (e) {} }
+    document.getElementById('chatMicBtn').classList.remove('listening');
+    document.getElementById('chatStatus').textContent = '';
+  }
+
+  function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+    addChatBubble(text, 'me');
+    speak(text);
+    input.value = '';
+  }
+
+  document.getElementById('chatInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+  });
 
   // ── Sound pattern detection (YAMNet via TensorFlow.js)
   // Índices verificados contra yamnet_class_map.csv (521 clases de AudioSet)
