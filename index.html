@@ -115,6 +115,15 @@
     flex-shrink: 0;
   }
 
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  #sosBtn {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.5);
+    color: var(--danger); font-size: 15px; cursor: pointer; touch-action: manipulation;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #sosBtn:active { background: rgba(239,68,68,0.3); }
+
   .logo { display: flex; align-items: center; gap: 10px; }
   .logo-icon {
     width: 36px; height: 36px;
@@ -611,6 +620,32 @@
   body.hc #fullscreenView { background: #000; }
   body.hc #fullscreenText { font-size: clamp(40px, 12vw, 120px); }
 
+  /* ── EMERGENCY CONTACT MODAL ── */
+  #emergencyConfigModal {
+    position: fixed; inset: 0; z-index: 950;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .modal-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+    padding: 20px; width: 100%; max-width: 340px;
+    display: flex; flex-direction: column; gap: 10px;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .modal-card h3 { font-size: 17px; font-weight: 800; }
+  .modal-hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .modal-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  #emergencyPhone, #emergencyMessage {
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; color: var(--text); font-family: var(--font-main); font-size: 14px;
+    outline: none;
+  }
+  #emergencyPhone:focus, #emergencyMessage:focus { border-color: var(--accent); }
+  #emergencyMessage { resize: none; height: 80px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .modal-actions .btn-secondary { flex: 1; }
+  .modal-actions .main-btn { flex: 1; padding: 12px; font-size: 14px; }
+
   /* ── SESSION HISTORY ── */
   #historyView {
     display: none; position: fixed; inset: 0; z-index: 900;
@@ -712,9 +747,12 @@
     <div class="logo-icon">👁️</div>
     <div class="logo-text">Subti<span>Voz</span></div>
   </div>
-  <div class="status-pill idle" id="statusPill">
-    <div class="dot"></div>
-    <span id="statusText">Listo</span>
+  <div class="header-right">
+    <button id="sosBtn" onclick="triggerEmergency()" title="Emergencia">🆘</button>
+    <div class="status-pill idle" id="statusPill">
+      <div class="dot"></div>
+      <span id="statusText">Listo</span>
+    </div>
   </div>
 </header>
 
@@ -848,6 +886,8 @@
 
     <button class="btn-secondary" style="width:100%;" onclick="openHistoryView()">🕘 Historial de sesiones</button>
 
+    <button class="btn-secondary" style="width:100%;" onclick="openEmergencyConfig()">🆘 Configurar contacto de emergencia</button>
+
     <div class="appearance-section">
       <div class="phrase-group-label">🎨 Personalizar apariencia</div>
 
@@ -874,7 +914,7 @@
       </div>
 
       <button class="btn-secondary" style="width:100%;" onclick="resetAppearance()">↺ Restablecer apariencia</button>
-      <div class="version-tag">SubtiVoz · versión 2026-07-06-D</div>
+      <div class="version-tag">SubtiVoz · versión 2026-07-06-E</div>
     </div>
   </div>
 </div>
@@ -1011,6 +1051,21 @@
     <span id="fsFinalText"></span><span class="interim-text" id="fsInterimText"></span>
   </div>
   <div id="fullscreenHint">Toca ✕ para salir</div>
+</div>
+
+<div id="emergencyConfigModal" style="display:none;">
+  <div class="modal-card">
+    <h3>🆘 Contacto de emergencia</h3>
+    <p class="modal-hint">Al tocar el botón 🆘, se abre tu app de mensajes con tu ubicación y este mensaje, lista para enviar.</p>
+    <label class="modal-label">Número de teléfono (con código de país)</label>
+    <input type="tel" id="emergencyPhone" placeholder="Ej: +5491122334455">
+    <label class="modal-label">Mensaje</label>
+    <textarea id="emergencyMessage" placeholder="Necesito ayuda, es una emergencia."></textarea>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeEmergencyConfig()">Cancelar</button>
+      <button class="main-btn btn-start" onclick="saveEmergencyContact()">Guardar</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1175,6 +1230,70 @@
     applyAppearance(currentAppearance);
     saveAppearance(currentAppearance);
     showToast('↺ Apariencia restablecida');
+  }
+
+  // ── Botón de emergencia (ubicación + SMS pre-armado a un contacto)
+  const EMERGENCY_KEY = 'subtivoz_emergency';
+  const DEFAULT_EMERGENCY_MESSAGE = 'Necesito ayuda, es una emergencia.';
+
+  function getEmergencyContact() {
+    try { return JSON.parse(localStorage.getItem(EMERGENCY_KEY) || 'null'); }
+    catch (err) { return null; }
+  }
+
+  function openEmergencyConfig() {
+    const contact = getEmergencyContact();
+    document.getElementById('emergencyPhone').value = contact ? contact.phone : '';
+    document.getElementById('emergencyMessage').value = contact ? contact.message : DEFAULT_EMERGENCY_MESSAGE;
+    document.getElementById('emergencyConfigModal').style.display = 'flex';
+  }
+
+  function closeEmergencyConfig() {
+    document.getElementById('emergencyConfigModal').style.display = 'none';
+  }
+
+  function saveEmergencyContact() {
+    const phone = document.getElementById('emergencyPhone').value.trim();
+    const message = document.getElementById('emergencyMessage').value.trim();
+    if (!phone) { showToast('⚠️ Ingresá un número de teléfono'); return; }
+    try {
+      localStorage.setItem(EMERGENCY_KEY, JSON.stringify({ phone, message: message || DEFAULT_EMERGENCY_MESSAGE }));
+      closeEmergencyConfig();
+      showToast('✅ Contacto de emergencia guardado');
+    } catch (err) {
+      showToast('⚠️ No se pudo guardar el contacto');
+    }
+  }
+
+  function triggerEmergency() {
+    const contact = getEmergencyContact();
+    if (!contact) {
+      showToast('📵 Primero configurá un contacto de emergencia');
+      openEmergencyConfig();
+      return;
+    }
+
+    const openSmsApp = (locationText) => {
+      const body = encodeURIComponent(`${contact.message} ${locationText}`.trim());
+      window.location.href = `sms:${contact.phone}?body=${body}`;
+    };
+
+    if ('geolocation' in navigator) {
+      showToast('📍 Obteniendo tu ubicación...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          openSmsApp(`Mi ubicación: https://maps.google.com/?q=${latitude},${longitude}`);
+        },
+        () => {
+          showToast('⚠️ No se pudo obtener tu ubicación — se envía el mensaje igual');
+          openSmsApp('(no se pudo obtener la ubicación)');
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      openSmsApp('');
+    }
   }
 
   // Font slider
