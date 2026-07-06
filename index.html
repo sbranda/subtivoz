@@ -477,6 +477,9 @@
   @keyframes stopPulse { 0%,100%{box-shadow:0 4px 24px rgba(239,68,68,0.25)} 50%{box-shadow:0 4px 32px rgba(239,68,68,0.45)} }
 
   .secondary-btns { display: flex; gap: 8px; }
+  .secondary-btns-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
   .btn-secondary {
     flex: 1; padding: 11px 6px; border-radius: 10px;
     border: 1px solid var(--border); background: var(--card);
@@ -486,6 +489,21 @@
     transition: all 0.2s ease; touch-action: manipulation;
   }
   .btn-secondary:active { background: rgba(0,229,255,0.08); border-color: var(--accent); color: var(--accent); }
+
+  .advanced-toggle-btn {
+    width: 100%; padding: 9px; background: none; border: none;
+    color: var(--muted); font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+    touch-action: manipulation;
+  }
+  .advanced-toggle-btn:active { color: var(--accent); }
+  #advancedChevron { transition: transform 0.2s ease; display: inline-block; }
+  .advanced-toggle-btn.open #advancedChevron { transform: rotate(180deg); }
+
+  .advanced-options {
+    display: none; flex-direction: column; gap: 10px;
+  }
+  .advanced-options.show { display: flex; }
 
   /* ── TOAST ── */
   .toast {
@@ -664,39 +682,44 @@
     <span class="font-value" id="fontValue">28px</span>
   </div>
 
-  <div class="meter-toggle-row">
-    <span class="meter-toggle-label">🔊 Medidor de volumen
-      <span class="meter-toggle-hint">(puede afectar la detección de voz en algunos teléfonos)</span>
-    </span>
-    <label class="switch">
-      <input type="checkbox" id="meterToggle">
-      <span class="switch-track"></span>
-    </label>
-  </div>
-
-  <div class="meter-toggle-row">
-    <span class="meter-toggle-label">🎭 Etiquetas automáticas (risas, aplausos, música)
-      <span class="meter-toggle-hint">(puede afectar la detección de voz en algunos teléfonos — probá si te funciona)</span>
-    </span>
-    <label class="switch">
-      <input type="checkbox" id="captionTagsToggle">
-      <span class="switch-track"></span>
-    </label>
-  </div>
-
   <button class="main-btn btn-start" id="mainBtn" onclick="toggleRecognition()">
     🎙️ Iniciar Subtítulos
   </button>
 
-  <div class="secondary-btns">
+  <div class="secondary-btns-grid">
     <button class="btn-secondary" onclick="clearSubtitles()">🗑️ Limpiar</button>
     <button class="btn-secondary" onclick="copyText()">📋 Copiar</button>
     <button class="btn-secondary" onclick="toggleHighContrast()">🔆 Contraste</button>
     <button class="btn-secondary" onclick="shareText()">↗️ Compartir</button>
+    <button class="btn-secondary" onclick="enterFullscreenMode()">⛶ Pantalla</button>
+    <button class="btn-secondary" onclick="enterCameraMode()">📷 Cámara</button>
   </div>
 
-  <button class="btn-secondary" style="width:100%;" onclick="enterFullscreenMode()">⛶ Pantalla completa (clases / videollamadas)</button>
-  <button class="btn-secondary" style="width:100%;" onclick="enterCameraMode()">📷 Subtítulos sobre la cámara (cara a cara)</button>
+  <button class="advanced-toggle-btn" onclick="toggleAdvancedOptions()">
+    ⚙️ Más opciones <span id="advancedChevron">▾</span>
+  </button>
+
+  <div class="advanced-options" id="advancedOptions">
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">🔊 Medidor de volumen
+        <span class="meter-toggle-hint">(puede afectar la detección de voz en algunos teléfonos)</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="meterToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">🎭 Etiquetas automáticas (risas, aplausos, música)
+        <span class="meter-toggle-hint">(puede afectar la detección de voz en algunos teléfonos — probá si te funciona)</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="captionTagsToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -1263,6 +1286,13 @@
   }
 
   let hc = false;
+  function toggleAdvancedOptions() {
+    const panel = document.getElementById('advancedOptions');
+    const btn = document.querySelector('.advanced-toggle-btn');
+    const isOpen = panel.classList.toggle('show');
+    btn.classList.toggle('open', isOpen);
+  }
+
   function toggleHighContrast() {
     hc = !hc;
     document.body.classList.toggle('hc', hc);
