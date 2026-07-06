@@ -191,19 +191,31 @@
   }
 
   /* ── SPEAK (TEXT-TO-SPEECH) MODE ── */
-  .speak-area { flex: 1; padding: 16px; display: flex; flex-direction: column; min-height: 0; }
+  .speak-area { flex: 1; padding: 16px; display: flex; flex-direction: column; min-height: 0; gap: 12px; }
   .speak-textarea {
-    flex: 1; width: 100%; resize: none;
+    height: 100px; flex-shrink: 0; width: 100%; resize: none;
     background: rgba(22,22,31,0.75); border: 1px solid var(--border); border-radius: 18px;
-    padding: 18px; color: var(--text); font-family: 'Syne', sans-serif;
-    font-size: 22px; font-weight: 600; line-height: 1.4;
-    outline: none; backdrop-filter: blur(10px); min-height: 0;
+    padding: 16px; color: var(--text); font-family: 'Syne', sans-serif;
+    font-size: 20px; font-weight: 600; line-height: 1.4;
+    outline: none; backdrop-filter: blur(10px);
   }
   .speak-textarea:focus { border-color: var(--accent); }
   .speak-textarea::placeholder { color: var(--muted); font-weight: 400; }
 
+  .quick-phrases-scroll {
+    flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; min-height: 0;
+  }
+  .quick-phrases-scroll::-webkit-scrollbar { display: none; }
+
+  .phrase-group-label {
+    font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.8px; font-family: 'Space Mono', monospace;
+    margin: 10px 0 6px; 
+  }
+  .phrase-group-label:first-child { margin-top: 0; }
+
   .quick-phrases {
-    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; flex-shrink: 0;
+    display: flex; flex-wrap: wrap; gap: 8px;
   }
   .quick-phrase-btn {
     padding: 8px 14px; border-radius: 100px; border: 1px solid var(--border);
@@ -597,14 +609,55 @@
 <div id="speakView" style="display:none; flex-direction:column; flex:1; min-height:0;">
   <div class="speak-area">
     <textarea class="speak-textarea" id="speakInput" placeholder="Escribe aquí lo que quieres decir..."></textarea>
-    <div class="quick-phrases" id="quickPhrases">
-      <button class="quick-phrase-btn" onclick="quickSpeak('Un momento por favor')">Un momento por favor</button>
-      <button class="quick-phrase-btn" onclick="quickSpeak('¿Puede repetir, por favor?')">¿Puede repetir?</button>
-      <button class="quick-phrase-btn" onclick="quickSpeak('No escucho, hábleme despacio')">No escucho, hábleme despacio</button>
-      <button class="quick-phrase-btn" onclick="quickSpeak('Sí')">Sí</button>
-      <button class="quick-phrase-btn" onclick="quickSpeak('No')">No</button>
-      <button class="quick-phrase-btn" onclick="quickSpeak('Gracias')">Gracias</button>
-      <button class="quick-phrase-btn" onclick="quickSpeak('Necesito ayuda, por favor')">Necesito ayuda</button>
+    <div class="quick-phrases-scroll">
+      <div class="phrase-group-label">Saludos</div>
+      <div class="quick-phrases">
+        <button class="quick-phrase-btn" onclick="quickSpeak('Hola')">Hola</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Buenos días')">Buenos días</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Buenas tardes')">Buenas tardes</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Buenas noches')">Buenas noches</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Chau, que tengas buen día')">Chau</button>
+      </div>
+
+      <div class="phrase-group-label">Comunicación</div>
+      <div class="quick-phrases">
+        <button class="quick-phrase-btn" onclick="quickSpeak('Un momento por favor')">Un momento por favor</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Puede repetir, por favor?')">¿Puede repetir?</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No escucho, hábleme despacio')">No escucho, hábleme despacio</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Soy sordo o sorda, me comunico por escrito o con esta app')">Soy sordo/a</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No entiendo, ¿puede escribirlo?')">¿Puede escribirlo?</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No entiendo')">No entiendo</button>
+      </div>
+
+      <div class="phrase-group-label">Respuestas rápidas</div>
+      <div class="quick-phrases">
+        <button class="quick-phrase-btn" onclick="quickSpeak('Sí')">Sí</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No')">No</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Por favor')">Por favor</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Gracias')">Gracias</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('De nada')">De nada</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Perdón, disculpe')">Perdón</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Está bien')">Está bien</button>
+      </div>
+
+      <div class="phrase-group-label">Necesidades</div>
+      <div class="quick-phrases">
+        <button class="quick-phrase-btn" onclick="quickSpeak('Necesito ayuda, por favor')">Necesito ayuda</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Dónde está el baño?')">¿Dónde está el baño?</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo hambre')">Tengo hambre</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo sed')">Tengo sed</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Estoy bien, gracias')">Estoy bien</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Cuánto cuesta?')">¿Cuánto cuesta?</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Acepta tarjeta?')">¿Acepta tarjeta?</button>
+      </div>
+
+      <div class="phrase-group-label">Salud y emergencia</div>
+      <div class="quick-phrases">
+        <button class="quick-phrase-btn" onclick="quickSpeak('No me siento bien')">No me siento bien</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Necesito un médico, por favor')">Necesito un médico</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Llame al 911 por favor, es una emergencia')">Llame al 911</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo una alergia')">Tengo una alergia</button>
+      </div>
     </div>
   </div>
 
