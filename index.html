@@ -384,6 +384,11 @@
   }
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
+  .caption-tag-line {
+    color: var(--muted); font-style: italic; text-align: center;
+    font-size: 0.9em; animation: fadeIn 0.3s ease; flex-shrink: 0;
+  }
+
   .current-subtitle {
     font-size: 28px; font-weight: 700; line-height: 1.3;
     color: var(--accent); letter-spacing: -0.3px;
@@ -659,6 +664,16 @@
     </label>
   </div>
 
+  <div class="meter-toggle-row">
+    <span class="meter-toggle-label">🎭 Etiquetas automáticas (risas, aplausos, música)
+      <span class="meter-toggle-hint">(puede afectar la detección de voz en algunos teléfonos — probá si te funciona)</span>
+    </span>
+    <label class="switch">
+      <input type="checkbox" id="captionTagsToggle">
+      <span class="switch-track"></span>
+    </label>
+  </div>
+
   <button class="main-btn btn-start" id="mainBtn" onclick="toggleRecognition()">
     🎙️ Iniciar Subtítulos
   </button>
@@ -868,6 +883,16 @@
     }
   });
 
+  let isCaptionTagsEnabled = false;
+  const captionTagsToggle = document.getElementById('captionTagsToggle');
+  captionTagsToggle.addEventListener('change', () => {
+    isCaptionTagsEnabled = captionTagsToggle.checked;
+    if (isListening) {
+      if (isCaptionTagsEnabled) startCaptionTagDetection();
+      else stopCaptionTagDetection();
+    }
+  });
+
   // Font slider
   const fontSlider = document.getElementById('fontSlider');
   const fontValueEl = document.getElementById('fontValue');
@@ -1030,6 +1055,7 @@
     isListening = true;
     try { recognition.start(); } catch(e) { showToast('Error al iniciar micrófono'); isListening = false; return; }
     if (isMeterEnabled) startVolumeMeter();
+    if (isCaptionTagsEnabled) startCaptionTagDetection();
     const btn = document.getElementById('mainBtn');
     btn.className = 'main-btn btn-stop';
     btn.textContent = '⏹️ Detener';
@@ -1039,6 +1065,7 @@
     isListening = false;
     if (recognition) { try { recognition.stop(); } catch(e){} }
     stopVolumeMeter();
+    stopCaptionTagDetection();
     clearInterval(timerInterval);
     setStatus('idle');
     document.getElementById('waveform').classList.remove('active');
@@ -1065,6 +1092,118 @@
     history.appendChild(line);
     scrollSubtitlesToBottom();
     document.getElementById('placeholder').style.display = 'none';
+  }
+
+  function addCaptionTag(icon, label) {
+    // Corta lo que se venía transcribiendo para que la etiqueta aparezca en el momento correcto
+    if (finalTranscript.trim()) {
+      addToHistory(finalTranscript.trim());
+      finalTranscript = '';
+      document.getElementById('finalText').textContent = '';
+    }
+    const history = document.getElementById('subtitleHistory');
+    const line = document.createElement('div');
+    line.className = 'caption-tag-line';
+    line.textContent = `[${icon} ${label}]`;
+    line.style.fontSize = Math.max(14, currentFontSize * 0.75) + 'px';
+    history.appendChild(line);
+    scrollSubtitlesToBottom();
+    document.getElementById('placeholder').style.display = 'none';
+  }
+
+  // ── Etiquetas automáticas de sonido ambiente (risas, aplausos, música)
+  // Reutiliza el mismo modelo de IA (YAMNet) que la pestaña Sonidos.
+  const CAPTION_TAG_CLASSES = {
+    Laugh: { indices: [13, 14, 17], icon: '😂', label: 'risas' },
+    Clap:  { indices: [58, 62],     icon: '👏', label: 'aplausos' },
+    Music: { indices: [132, 262],   icon: '🎵', label: 'música de fondo' }
+  };
+  const CAPTION_TAG_THRESHOLD = 0.35;
+  const CAPTION_TAG_COOLDOWN_MS = 3000;
+
+  let captionAudioCtx = null;
+  let captionStream = null;
+  let captionProcessor = null;
+  let captionSource = null;
+  let captionBufferQueue = [];
+  let captionBufferedSamples = 0;
+  let captionLastTrigger = {};
+
+  async function startCaptionTagDetection() {
+    try {
+      await ensureSoundModel();
+      captionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      captionAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      captionSource = captionAudioCtx.createMediaStreamSource(captionStream);
+      captionProcessor = captionAudioCtx.createScriptProcessor(4096, 1, 1);
+      captionBufferQueue = [];
+      captionBufferedSamples = 0;
+
+      captionProcessor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        captionBufferQueue.push(new Float32Array(input));
+        captionBufferedSamples += input.length;
+        if (captionBufferedSamples >= captionAudioCtx.sampleRate) {
+          const merged = new Float32Array(captionBufferedSamples);
+          let offset = 0;
+          for (const chunk of captionBufferQueue) { merged.set(chunk, offset); offset += chunk.length; }
+          captionBufferQueue = [];
+          captionBufferedSamples = 0;
+          classifyCaptionChunk(merged, captionAudioCtx.sampleRate);
+        }
+      };
+
+      const silentGain = captionAudioCtx.createGain();
+      silentGain.gain.value = 0;
+      captionSource.connect(captionProcessor);
+      captionProcessor.connect(silentGain);
+      silentGain.connect(captionAudioCtx.destination);
+    } catch (err) {
+      console.error(err);
+      showToast('⚠️ No se pudieron activar las etiquetas automáticas');
+      captionTagsToggle.checked = false;
+      isCaptionTagsEnabled = false;
+    }
+  }
+
+  function stopCaptionTagDetection() {
+    if (captionProcessor) { captionProcessor.onaudioprocess = null; captionProcessor.disconnect(); }
+    if (captionSource) captionSource.disconnect();
+    if (captionStream) captionStream.getTracks().forEach(t => t.stop());
+    if (captionAudioCtx) captionAudioCtx.close().catch(() => {});
+    captionProcessor = null; captionSource = null; captionStream = null; captionAudioCtx = null;
+  }
+
+  async function classifyCaptionChunk(buffer, origRate) {
+    if (!soundModel) return;
+    let waveformTensor, result;
+    try {
+      const resampled = resampleTo16k(buffer, origRate);
+      waveformTensor = tf.tensor1d(resampled);
+      result = soundModel.predict(waveformTensor);
+      const scoresTensor = Array.isArray(result) ? result[0] : result;
+      const scores = await scoresTensor.array();
+      const numFrames = scores.length;
+      const numClasses = scores[0].length;
+      const avg = new Array(numClasses).fill(0);
+      for (const frame of scores) for (let i = 0; i < numClasses; i++) avg[i] += frame[i] / numFrames;
+
+      for (const [cat, info] of Object.entries(CAPTION_TAG_CLASSES)) {
+        const score = Math.max(...info.indices.map(i => avg[i] || 0));
+        if (score >= CAPTION_TAG_THRESHOLD) {
+          const now = Date.now();
+          if (!captionLastTrigger[cat] || now - captionLastTrigger[cat] > CAPTION_TAG_COOLDOWN_MS) {
+            captionLastTrigger[cat] = now;
+            addCaptionTag(info.icon, info.label);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error de clasificación de etiquetas:', err);
+    } finally {
+      if (waveformTensor) waveformTensor.dispose();
+      if (result) (Array.isArray(result) ? result : [result]).forEach(t => t.dispose());
+    }
   }
 
   function clearSubtitles() {
