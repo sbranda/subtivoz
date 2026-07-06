@@ -410,6 +410,20 @@
     padding: 4px 8px 4px 8px; border-radius: 0 8px 8px 0;
   }
 
+  .speaker-tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55em; font-weight: 700;
+    padding: 2px 8px; border-radius: 100px;
+    margin-right: 6px; vertical-align: middle;
+    cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .speaker-tag.speaker-1 { background: rgba(0,229,255,0.15); color: var(--accent); border: 1px solid rgba(0,229,255,0.4); }
+  .speaker-tag.speaker-2 { background: rgba(124,58,237,0.15); color: var(--accent2); border: 1px solid rgba(124,58,237,0.4); }
+  .speaker-tag.speaker-3 { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.4); }
+  .speaker-tag.speaker-4 { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.4); }
+
   .current-subtitle {
     font-size: 28px; font-weight: 700; line-height: 1.3;
     color: var(--accent); letter-spacing: -0.3px;
@@ -805,6 +819,7 @@
         <div class="subtitle-history" id="subtitleHistory"></div>
 
         <div class="current-subtitle" id="currentSubtitle">
+          <span class="speaker-tag speaker-1" id="liveSpeakerTag" style="display:none;">Persona 1</span>
           <span id="finalText"></span><span class="interim-text" id="interimText"></span><span class="cursor-blink" id="cursor"></span>
         </div>
       </div>
@@ -868,6 +883,16 @@
       </span>
       <label class="switch">
         <input type="checkbox" id="translateToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">🗣️ Identificar hablantes
+        <span class="meter-toggle-hint">Etiqueta cambios de turno por pausas (aproximado — toca la etiqueta para corregirla)</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="speakerToggle">
         <span class="switch-track"></span>
       </label>
     </div>
@@ -1192,6 +1217,26 @@
     translateTargetRow.classList.toggle('show', translationEnabled);
   });
 
+  // ── Identificación de hablantes (por pausas)
+  let speakerIdEnabled = false;
+  let currentSpeakerNum = 1;
+  let lastFinalEndTime = null;
+  const TURN_PAUSE_MS = 1200; // gap that counts as a possible speaker change
+
+  const speakerToggle = document.getElementById('speakerToggle');
+  speakerToggle.addEventListener('change', () => {
+    speakerIdEnabled = speakerToggle.checked;
+    document.getElementById('liveSpeakerTag').style.display = speakerIdEnabled && isListening ? 'inline-block' : 'none';
+  });
+
+  function updateLiveSpeakerTag() {
+    const tag = document.getElementById('liveSpeakerTag');
+    if (!speakerIdEnabled) { tag.style.display = 'none'; return; }
+    tag.className = 'speaker-tag speaker-' + currentSpeakerNum;
+    tag.textContent = 'Persona ' + currentSpeakerNum;
+    tag.style.display = 'inline-block';
+  }
+
   // ── Personalización de apariencia (tipografía y color de acento)
   const FONT_STACKS = {
     syne: "'Syne', sans-serif",
@@ -1357,6 +1402,9 @@
       currentSubtitleEl.style.display = 'block';
       document.getElementById('cursor').style.display = 'inline-block';
       document.getElementById('sessionStats').style.display = 'flex';
+      currentSpeakerNum = 1;
+      lastFinalEndTime = null;
+      updateLiveSpeakerTag();
       startTime = Date.now();
       timerInterval = setInterval(updateTimer, 1000);
     };
@@ -1366,12 +1414,21 @@
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
+          const now = Date.now();
+          if (speakerIdEnabled && lastFinalEndTime !== null && (now - lastFinalEndTime) > TURN_PAUSE_MS && finalTranscript.trim()) {
+            // Pausa larga detectada: cerramos el bloque con el hablante anterior y cambiamos
+            addToHistory(finalTranscript.trim(), currentSpeakerNum);
+            finalTranscript = '';
+            currentSpeakerNum = currentSpeakerNum === 1 ? 2 : 1;
+            updateLiveSpeakerTag();
+          }
+          lastFinalEndTime = now;
           finalTranscript += t + ' ';
           allText += t + ' ';
           wordCount = allText.trim().split(/\s+/).filter(Boolean).length;
           document.getElementById('wordsStat').textContent = wordCount + ' palabras';
           if (finalTranscript.length > 100) {
-            addToHistory(finalTranscript.trim());
+            addToHistory(finalTranscript.trim(), currentSpeakerNum);
             finalTranscript = '';
           }
         } else {
@@ -1496,9 +1553,10 @@
     setStatus('idle');
     document.getElementById('waveform').classList.remove('active');
     document.getElementById('cursor').style.display = 'none';
+    document.getElementById('liveSpeakerTag').style.display = 'none';
     const remaining = (finalTranscript + document.getElementById('interimText').textContent).trim();
     if (remaining) {
-      addToHistory(remaining); finalTranscript = ''; document.getElementById('finalText').textContent = ''; document.getElementById('interimText').textContent = '';
+      addToHistory(remaining, currentSpeakerNum); finalTranscript = ''; document.getElementById('finalText').textContent = ''; document.getElementById('interimText').textContent = '';
       if (isFullscreenMode) { document.getElementById('fsFinalText').textContent = ''; document.getElementById('fsInterimText').textContent = ''; }
       if (isCameraMode) { document.getElementById('ccFinalText').textContent = ''; document.getElementById('ccInterimText').textContent = ''; }
     }
@@ -1508,14 +1566,34 @@
     if (allText.trim()) showToast('✅ Listo — ' + wordCount + ' palabras');
   }
 
-  function addToHistory(text) {
+  function addToHistory(text, speakerNum) {
     if (!text.trim()) return;
     const history = document.getElementById('subtitleHistory');
     const line = document.createElement('div');
     line.className = 'history-line';
     if (text.trim().endsWith('?')) line.classList.add('is-question');
-    line.textContent = text.trim();
     line.style.fontSize = currentFontSize + 'px';
+
+    if (speakerIdEnabled && speakerNum) {
+      const tag = document.createElement('span');
+      tag.className = 'speaker-tag speaker-' + speakerNum;
+      tag.textContent = 'Persona ' + speakerNum;
+      tag.dataset.speaker = speakerNum;
+      tag.title = 'Toca para corregir';
+      tag.onclick = (e) => {
+        e.stopPropagation();
+        let n = parseInt(tag.dataset.speaker, 10);
+        n = n >= 4 ? 1 : n + 1;
+        tag.dataset.speaker = n;
+        tag.className = 'speaker-tag speaker-' + n;
+        tag.textContent = 'Persona ' + n;
+      };
+      line.appendChild(tag);
+      line.appendChild(document.createTextNode(' ' + text.trim()));
+    } else {
+      line.textContent = text.trim();
+    }
+
     history.appendChild(line);
 
     const sourceLang = document.getElementById('langSelect').value.split('-')[0];
@@ -1554,7 +1632,7 @@
   function addCaptionTag(icon, label) {
     // Corta lo que se venía transcribiendo para que la etiqueta aparezca en el momento correcto
     if (finalTranscript.trim()) {
-      addToHistory(finalTranscript.trim());
+      addToHistory(finalTranscript.trim(), currentSpeakerNum);
       finalTranscript = '';
       document.getElementById('finalText').textContent = '';
     }
@@ -1758,6 +1836,9 @@
     document.getElementById('interimText').textContent = '';
     currentSubtitleEl.classList.remove('is-question');
     finalTranscript = ''; allText = ''; wordCount = 0;
+    currentSpeakerNum = 1;
+    lastFinalEndTime = null;
+    updateLiveSpeakerTag();
     // Si había una sesión en curso guardada, la borramos y empieza una nueva
     if (currentSessionId) {
       saveSessions(getSessions().filter(s => s.id !== currentSessionId));
