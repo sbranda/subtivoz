@@ -500,6 +500,34 @@
   body.hc { --bg:#000; --surface:#000; --card:#111; --border:#555; --text:#fff; --accent:#ffff00; --muted:#aaa; }
   body.hc .current-subtitle { font-size: clamp(28px,9vw,48px) !important; }
   body.hc .subtitle-box { background: #000; border-color: #555; }
+
+  /* ── FULLSCREEN SUBTITLE MODE ── */
+  #fullscreenView {
+    position: fixed; inset: 0; z-index: 900;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 32px calc(24px + var(--safe-top)) calc(32px + var(--safe-bottom));
+  }
+  #fullscreenText {
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: clamp(36px, 10vw, 110px); line-height: 1.25;
+    color: var(--text); text-align: center;
+    max-height: 80vh; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;
+  }
+  #fullscreenText::-webkit-scrollbar { display: none; }
+  #fsInterimText { color: var(--accent); opacity: 0.85; }
+  #exitFullscreenBtn {
+    position: absolute; top: calc(16px + var(--safe-top)); right: 16px;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    font-size: 20px; cursor: pointer; touch-action: manipulation;
+  }
+  #fullscreenHint {
+    position: absolute; bottom: calc(16px + var(--safe-bottom));
+    font-size: 12px; color: var(--muted); font-family: 'Space Mono', monospace;
+  }
+  body.hc #fullscreenView { background: #000; }
+  body.hc #fullscreenText { font-size: clamp(40px, 12vw, 120px); }
 </style>
 </head>
 <body>
@@ -614,6 +642,8 @@
     <button class="btn-secondary" onclick="toggleHighContrast()">🔆 Contraste</button>
     <button class="btn-secondary" onclick="shareText()">↗️ Compartir</button>
   </div>
+
+  <button class="btn-secondary" style="width:100%;" onclick="enterFullscreenMode()">⛶ Pantalla completa (clases / videollamadas)</button>
 </div>
 </div>
 
@@ -721,6 +751,14 @@
 </div>
 
 <div class="loud-flash" id="loudFlash"></div>
+
+<div id="fullscreenView" style="display:none;">
+  <button id="exitFullscreenBtn" onclick="exitFullscreenMode()">✕</button>
+  <div id="fullscreenText">
+    <span id="fsFinalText"></span><span class="interim-text" id="fsInterimText"></span>
+  </div>
+  <div id="fullscreenHint">Toca ✕ para salir</div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -857,6 +895,11 @@
       }
       document.getElementById('finalText').textContent = finalTranscript;
       document.getElementById('interimText').textContent = interim;
+      if (isFullscreenMode) {
+        document.getElementById('fsFinalText').textContent = finalTranscript;
+        document.getElementById('fsInterimText').textContent = interim;
+        document.getElementById('fullscreenText').scrollTop = document.getElementById('fullscreenText').scrollHeight;
+      }
       scrollSubtitlesToBottom();
     };
 
@@ -959,7 +1002,10 @@
     document.getElementById('waveform').classList.remove('active');
     document.getElementById('cursor').style.display = 'none';
     const remaining = (finalTranscript + document.getElementById('interimText').textContent).trim();
-    if (remaining) { addToHistory(remaining); finalTranscript = ''; document.getElementById('finalText').textContent = ''; document.getElementById('interimText').textContent = ''; }
+    if (remaining) {
+      addToHistory(remaining); finalTranscript = ''; document.getElementById('finalText').textContent = ''; document.getElementById('interimText').textContent = '';
+      if (isFullscreenMode) { document.getElementById('fsFinalText').textContent = ''; document.getElementById('fsInterimText').textContent = ''; }
+    }
     const btn = document.getElementById('mainBtn');
     btn.className = 'main-btn btn-start';
     btn.textContent = '🎙️ Iniciar Subtítulos';
@@ -1015,6 +1061,46 @@
     document.body.classList.toggle('hc', hc);
     showToast(hc ? '🔆 Alto contraste ON' : '🔅 Contraste normal');
   }
+
+  // ── Modo pantalla completa (para clases / videollamadas)
+  let isFullscreenMode = false;
+
+  async function enterFullscreenMode() {
+    const view = document.getElementById('fullscreenView');
+    view.style.display = 'flex';
+    isFullscreenMode = true;
+
+    // Copia el texto actual antes de que empiece a llegar texto nuevo
+    document.getElementById('fsFinalText').textContent = finalTranscript;
+    document.getElementById('fsInterimText').textContent = document.getElementById('interimText').textContent;
+
+    try {
+      if (view.requestFullscreen) await view.requestFullscreen();
+      else if (view.webkitRequestFullscreen) await view.webkitRequestFullscreen();
+    } catch (err) {
+      // Si el navegador no permite pantalla completa real, seguimos igual mostrando el overlay grande
+    }
+
+    if (!isListening) startRecognition();
+  }
+
+  async function exitFullscreenMode() {
+    isFullscreenMode = false;
+    document.getElementById('fullscreenView').style.display = 'none';
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitFullscreenElement && document.webkitExitFullscreen) await document.webkitExitFullscreen();
+    } catch (err) {}
+  }
+
+  // Si el usuario sale de pantalla completa con el botón atrás del sistema,
+  // el gesto o el navegador, actualizamos el estado igual.
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && isFullscreenMode) {
+      isFullscreenMode = false;
+      document.getElementById('fullscreenView').style.display = 'none';
+    }
+  });
 
   function setStatus(state) {
     const pill = document.getElementById('statusPill');
