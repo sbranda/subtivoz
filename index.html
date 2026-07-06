@@ -207,6 +207,17 @@
   }
   .quick-phrases-scroll::-webkit-scrollbar { display: none; }
 
+  .speaking-indicator {
+    display: none; align-items: center; justify-content: center; gap: 10px;
+    padding: 6px 0; flex-shrink: 0;
+  }
+  .speaking-indicator.active { display: flex; }
+  .speaking-indicator .waveform { opacity: 1; height: 22px; }
+  .speaking-indicator span {
+    font-size: 12px; font-weight: 700; color: var(--accent);
+    font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
   .phrase-group-label {
     font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
     letter-spacing: 0.8px; font-family: 'Space Mono', monospace;
@@ -609,6 +620,16 @@
 <div id="speakView" style="display:none; flex-direction:column; flex:1; min-height:0;">
   <div class="speak-area">
     <textarea class="speak-textarea" id="speakInput" placeholder="Escribe aquí lo que quieres decir..."></textarea>
+
+    <div class="speaking-indicator" id="speakingIndicator">
+      <div class="waveform" id="speakWaveform">
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div>
+      </div>
+      <span id="speakingLabel">🔊 Hablando...</span>
+    </div>
+
     <div class="quick-phrases-scroll">
       <div class="phrase-group-label">Saludos</div>
       <div class="quick-phrases">
@@ -1088,7 +1109,15 @@
       if (voice) utterance.voice = voice;
       utterance.rate = 1;
 
+      utterance.onstart = () => {
+        document.getElementById('speakingIndicator').classList.add('active');
+      };
+      utterance.onend = () => {
+        document.getElementById('speakingIndicator').classList.remove('active');
+      };
+
       utterance.onerror = (e) => {
+        document.getElementById('speakingIndicator').classList.remove('active');
         // 'canceled' e 'interrupted' ocurren cuando se reemplaza la frase a propósito; no son errores reales
         if (e.error === 'canceled' || e.error === 'interrupted') return;
         if (e.error === 'language-unavailable' || e.error === 'voice-unavailable') {
@@ -1118,6 +1147,7 @@
   function stopSpeaking() {
     speakPending = false;
     if ('speechSynthesis' in window) speechSynthesis.cancel();
+    document.getElementById('speakingIndicator').classList.remove('active');
   }
 
   function clearSpeakInput() {
