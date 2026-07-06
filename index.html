@@ -220,6 +220,11 @@
     text-align: center; font-size: 12px; color: var(--muted);
     font-family: 'Space Mono', monospace; flex-shrink: 0;
   }
+  .sound-disclaimer {
+    font-size: 11px; color: var(--muted); text-align: center;
+    line-height: 1.4; padding: 8px 6px; flex-shrink: 0;
+  }
+  .sound-disclaimer strong { color: var(--text); }
   .sound-grid {
     display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0;
   }
@@ -620,7 +625,10 @@
       <div class="sound-card" id="cardSmoke"><div class="sound-icon">🚨</div><div class="sound-name">Alarma de humo</div></div>
       <div class="sound-card" id="cardBaby"><div class="sound-icon">👶</div><div class="sound-name">Llanto de bebé</div></div>
       <div class="sound-card" id="cardHorn"><div class="sound-icon">🚗</div><div class="sound-name">Bocina / claxon</div></div>
+      <div class="sound-card" id="cardDog"><div class="sound-icon">🐕</div><div class="sound-name">Perro ladrando</div></div>
+      <div class="sound-card" id="cardAlarm"><div class="sound-icon">⚠️</div><div class="sound-name">Alarma / pitido genérico</div></div>
     </div>
+    <div class="sound-disclaimer">⚠️ El micrófono no puede detectar gas en el aire — solo reconoce el <strong>sonido de una alarma</strong> si ya tenés un detector instalado.</div>
     <div class="sound-history" id="soundHistory"></div>
   </div>
 
@@ -1069,7 +1077,9 @@
     Doorbell: { indices: [349, 350], icon: '🔔', label: 'Timbre de puerta' },   // Doorbell, Ding-dong
     Smoke:    { indices: [393, 394], icon: '🚨', label: 'Alarma de humo' },      // Smoke detector/alarm, Fire alarm
     Baby:     { indices: [20, 19],   icon: '👶', label: 'Llanto de bebé' },      // Baby cry/infant cry, Crying/sobbing
-    Horn:     { indices: [302, 102, 303], icon: '🚗', label: 'Bocina / claxon' } // Vehicle horn, Honk, Toot
+    Horn:     { indices: [302, 102, 303], icon: '🚗', label: 'Bocina / claxon' }, // Vehicle horn, Honk, Toot
+    Dog:      { indices: [69, 70, 73], icon: '🐕', label: 'Perro ladrando' },    // Dog, Bark, Bow-wow
+    Alarm:    { indices: [382, 475], icon: '⚠️', label: 'Alarma o pitido genérico (revisar qué es)' } // Alarm, Beep/bleep
   };
   const SOUND_THRESHOLD = 0.35;
   const SOUND_COOLDOWN_MS = 4000;
