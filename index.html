@@ -1105,11 +1105,12 @@
   </div>
   <div class="chat-status" id="chatStatus"></div>
 
-  <div class="secondary-btns-grid" style="grid-template-columns: repeat(4, 1fr); padding-bottom: 10px;">
+  <div class="secondary-btns-grid" style="grid-template-columns: repeat(5, 1fr); padding-bottom: 10px;">
     <button class="btn-secondary" onclick="clearChat()">🗑️ Limpiar</button>
     <button class="btn-secondary" onclick="copyChatText()">📋 Copiar</button>
     <button class="btn-secondary" onclick="toggleHighContrast()">🔆 Contraste</button>
     <button class="btn-secondary" onclick="shareChatText()">↗️ Compartir</button>
+    <button class="btn-secondary" onclick="openHistoryView()">🕘 Historial</button>
   </div>
 
   <div class="meter-toggle-row" style="margin-bottom: 10px;">
@@ -1851,6 +1852,7 @@
   const SESSIONS_KEY = 'subtivoz_sessions';
   const MAX_SESSIONS = 20;
   let currentSessionId = null;
+  let chatSessionId = null;
 
   function getSessions() {
     try { return JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]'); }
@@ -1866,7 +1868,19 @@
     if (!currentSessionId || !allText.trim()) return;
     const sessions = getSessions();
     const idx = sessions.findIndex(s => s.id === currentSessionId);
-    const entry = { id: currentSessionId, timestamp: new Date(currentSessionId).toISOString(), wordCount, text: allText.trim() };
+    const entry = { id: currentSessionId, type: 'listen', timestamp: new Date(currentSessionId).toISOString(), wordCount, text: allText.trim() };
+    if (idx >= 0) sessions[idx] = entry; else sessions.unshift(entry);
+    while (sessions.length > MAX_SESSIONS) sessions.pop();
+    saveSessions(sessions);
+  }
+
+  function upsertChatSession() {
+    const text = getChatText();
+    if (!chatSessionId || !text.trim()) return;
+    const sessions = getSessions();
+    const idx = sessions.findIndex(s => s.id === chatSessionId);
+    const wc = text.trim().split(/\s+/).filter(Boolean).length;
+    const entry = { id: chatSessionId, type: 'chat', timestamp: new Date(chatSessionId).toISOString(), wordCount: wc, text };
     if (idx >= 0) sessions[idx] = entry; else sessions.unshift(entry);
     while (sessions.length > MAX_SESSIONS) sessions.pop();
     saveSessions(sessions);
@@ -1903,9 +1917,10 @@
 
       const card = document.createElement('div');
       card.className = 'history-session-card';
+      const typeIcon = s.type === 'chat' ? '💬' : '🎙️';
       card.innerHTML = `
         <div class="history-session-meta">
-          <span>${dateStr} · ${timeStr}</span>
+          <span>${typeIcon} ${dateStr} · ${timeStr}</span>
           <span>${s.wordCount || s.text.trim().split(/\s+/).length} palabras</span>
         </div>
         <div class="history-session-preview">${escapeHtml(preview)}</div>
@@ -2265,6 +2280,7 @@
     if (!text.trim()) return;
     const empty = document.getElementById('chatEmpty');
     if (empty) empty.remove();
+    if (!chatSessionId) chatSessionId = Date.now();
 
     const messages = document.getElementById('chatMessages');
     const bubble = document.createElement('div');
@@ -2284,6 +2300,7 @@
       }
     }
 
+    upsertChatSession();
     messages.scrollTop = messages.scrollHeight;
   }
 
@@ -2391,6 +2408,10 @@
 
   function clearChat() {
     document.getElementById('chatMessages').innerHTML = '<div class="chat-empty" id="chatEmpty">💬 Tocá el micrófono para escuchar a la otra persona, o escribí tu respuesta abajo.</div>';
+    if (chatSessionId) {
+      saveSessions(getSessions().filter(s => s.id !== chatSessionId));
+      chatSessionId = null;
+    }
     showToast('🗑️ Chat limpiado');
   }
 
