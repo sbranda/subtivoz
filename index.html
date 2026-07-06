@@ -514,7 +514,10 @@
 
   .advanced-options {
     display: none; flex-direction: column; gap: 10px;
+    max-height: 42vh; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;
+    padding-right: 2px;
   }
+  .advanced-options::-webkit-scrollbar { display: none; }
   .advanced-options.show { display: flex; }
 
   .translation-line {
