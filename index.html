@@ -1104,6 +1104,27 @@
     <div class="chat-empty" id="chatEmpty">💬 Tocá el micrófono para escuchar a la otra persona, o escribí tu respuesta abajo.</div>
   </div>
   <div class="chat-status" id="chatStatus"></div>
+
+  <div class="secondary-btns-grid" style="grid-template-columns: repeat(4, 1fr); padding-bottom: 10px;">
+    <button class="btn-secondary" onclick="clearChat()">🗑️ Limpiar</button>
+    <button class="btn-secondary" onclick="copyChatText()">📋 Copiar</button>
+    <button class="btn-secondary" onclick="toggleHighContrast()">🔆 Contraste</button>
+    <button class="btn-secondary" onclick="shareChatText()">↗️ Compartir</button>
+  </div>
+
+  <div class="meter-toggle-row" style="margin-bottom: 10px;">
+    <span class="meter-toggle-label">🌐 Traducir a la otra persona</span>
+    <label class="switch">
+      <input type="checkbox" id="chatTranslateToggle">
+      <span class="switch-track"></span>
+    </label>
+  </div>
+
+  <div class="translate-target-row" id="chatTranslateTargetRow" style="margin-bottom: 10px;">
+    <span class="font-label">Traducir a</span>
+    <select class="lang-select" id="chatTranslateTarget"></select>
+  </div>
+
   <div class="chat-input-row">
     <button id="chatMicBtn" onclick="toggleChatMic()">🎙️</button>
     <input type="text" id="chatInput" placeholder="Escribí tu respuesta...">
@@ -1275,10 +1296,32 @@
   let translationEnabled = false;
   const translateToggle = document.getElementById('translateToggle');
   const translateTargetRow = document.getElementById('translateTargetRow');
-  translateToggle.addEventListener('change', () => {
-    translationEnabled = translateToggle.checked;
-    translateTargetRow.classList.toggle('show', translationEnabled);
+  const chatTranslateToggle = document.getElementById('chatTranslateToggle');
+  const chatTranslateTargetRow = document.getElementById('chatTranslateTargetRow');
+  const chatTranslateTarget = document.getElementById('chatTranslateTarget');
+
+  // La pestaña Chat usa el mismo desplegable de idiomas que Subtítulos (evita duplicar la lista)
+  document.getElementById('translateTarget').querySelectorAll('option').forEach(opt => {
+    chatTranslateTarget.appendChild(opt.cloneNode(true));
   });
+
+  function setTranslationEnabled(enabled) {
+    translationEnabled = enabled;
+    translateToggle.checked = enabled;
+    chatTranslateToggle.checked = enabled;
+    translateTargetRow.classList.toggle('show', enabled);
+    chatTranslateTargetRow.classList.toggle('show', enabled);
+  }
+
+  function setTranslateTarget(lang) {
+    document.getElementById('translateTarget').value = lang;
+    chatTranslateTarget.value = lang;
+  }
+
+  translateToggle.addEventListener('change', () => setTranslationEnabled(translateToggle.checked));
+  chatTranslateToggle.addEventListener('change', () => setTranslationEnabled(chatTranslateToggle.checked));
+  document.getElementById('translateTarget').addEventListener('change', (e) => setTranslateTarget(e.target.value));
+  chatTranslateTarget.addEventListener('change', (e) => setTranslateTarget(e.target.value));
 
   // ── Identificación de hablantes (por pausas)
   let speakerIdEnabled = false;
@@ -2319,6 +2362,39 @@
   document.getElementById('chatInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendChatMessage();
   });
+
+  function clearChat() {
+    document.getElementById('chatMessages').innerHTML = '<div class="chat-empty" id="chatEmpty">💬 Tocá el micrófono para escuchar a la otra persona, o escribí tu respuesta abajo.</div>';
+    showToast('🗑️ Chat limpiado');
+  }
+
+  function getChatText() {
+    return Array.from(document.querySelectorAll('.chat-bubble')).map(b => {
+      const isMe = b.classList.contains('me');
+      const translation = b.querySelector('.chat-bubble-translation');
+      let mainText = b.childNodes[0] ? b.childNodes[0].textContent.trim() : b.textContent.trim();
+      let line = (isMe ? 'Yo: ' : 'Ellos: ') + mainText;
+      if (translation) line += '\n' + translation.textContent.trim();
+      return line;
+    }).join('\n');
+  }
+
+  function copyChatText() {
+    const text = getChatText();
+    if (!text) { showToast('No hay conversación para copiar'); return; }
+    navigator.clipboard ? navigator.clipboard.writeText(text).then(() => showToast('📋 Copiado'))
+                         : showToast('Copia no disponible');
+  }
+
+  function shareChatText() {
+    const text = getChatText();
+    if (!text) { showToast('No hay conversación para compartir'); return; }
+    if (navigator.share) {
+      navigator.share({ title: 'SubtiVoz - Conversación', text }).catch(() => {});
+    } else {
+      copyChatText();
+    }
+  }
 
   // ── Sound pattern detection (YAMNet via TensorFlow.js)
   // Índices verificados contra yamnet_class_map.csv (521 clases de AudioSet)
