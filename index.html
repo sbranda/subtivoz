@@ -2210,12 +2210,22 @@
     if (loudLevelHistory.length > LOUD_HISTORY_SIZE) loudLevelHistory.shift();
   }
 
+  let vibrateWarningShown = false;
+  function tryVibrate(pattern) {
+    if (!navigator.vibrate) return;
+    const accepted = navigator.vibrate(pattern);
+    if (!accepted && !vibrateWarningShown) {
+      vibrateWarningShown = true;
+      showToast('📳 El navegador rechazó la vibración — revisá Ajustes > Sonido y vibración');
+    }
+  }
+
   function triggerLoudSoundAlert() {
     const now = Date.now();
     if (now - lastAnyTrigger < 1200) return; // ya vibró por una detección específica hace un instante
     lastAnyTrigger = now;
 
-    if (navigator.vibrate) navigator.vibrate(300);
+    tryVibrate(300);
     const flash = document.getElementById('loudFlash');
     flash.classList.remove('show');
     void flash.offsetWidth; // reinicia la animación si se repite rápido
@@ -2376,7 +2386,7 @@
       card.classList.add('sound-active');
       setTimeout(() => card.classList.remove('sound-active'), 2500);
     }
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    tryVibrate([200, 100, 200]);
 
     const history = document.getElementById('soundHistory');
     const line = document.createElement('div');
