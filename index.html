@@ -505,6 +505,20 @@
   }
   .advanced-options.show { display: flex; }
 
+  .translation-line {
+    color: var(--accent); font-style: italic; font-weight: 600;
+    line-height: 1.3; flex-shrink: 0; opacity: 0.9;
+    margin-top: -2px;
+  }
+
+  .translate-target-row {
+    display: none; align-items: center; gap: 10px;
+    padding: 9px 13px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .translate-target-row.show { display: flex; }
+  .translate-target-row .lang-select { flex: 1; }
+
   /* ── TOAST ── */
   .toast {
     position: fixed; bottom: 90px; left: 50%;
@@ -718,6 +732,28 @@
         <input type="checkbox" id="captionTagsToggle">
         <span class="switch-track"></span>
       </label>
+    </div>
+
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">🌐 Traducir subtítulos
+        <span class="meter-toggle-hint">Traduce cada frase ya dicha (necesita internet, servicio gratuito con límite diario)</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="translateToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div class="translate-target-row" id="translateTargetRow">
+      <span class="font-label">Traducir a</span>
+      <select class="lang-select" id="translateTarget">
+        <option value="es">🇪🇸 Español</option>
+        <option value="en">🇺🇸 English</option>
+        <option value="pt">🇧🇷 Português</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="it">🇮🇹 Italiano</option>
+      </select>
     </div>
   </div>
 </div>
@@ -941,6 +977,14 @@
     }
   });
 
+  let translationEnabled = false;
+  const translateToggle = document.getElementById('translateToggle');
+  const translateTargetRow = document.getElementById('translateTargetRow');
+  translateToggle.addEventListener('change', () => {
+    translationEnabled = translateToggle.checked;
+    translateTargetRow.classList.toggle('show', translationEnabled);
+  });
+
   // Font slider
   const fontSlider = document.getElementById('fontSlider');
   const fontValueEl = document.getElementById('fontValue');
@@ -1138,8 +1182,37 @@
     line.textContent = text.trim();
     line.style.fontSize = currentFontSize + 'px';
     history.appendChild(line);
+
+    const sourceLang = document.getElementById('langSelect').value.split('-')[0];
+    const targetLang = document.getElementById('translateTarget').value;
+    if (translationEnabled && sourceLang !== targetLang) {
+      const translationEl = document.createElement('div');
+      translationEl.className = 'translation-line';
+      translationEl.textContent = '🌐 Traduciendo...';
+      translationEl.style.fontSize = Math.max(13, currentFontSize * 0.7) + 'px';
+      history.appendChild(translationEl);
+      translateLine(text.trim(), sourceLang, targetLang, translationEl);
+    }
+
     scrollSubtitlesToBottom();
     document.getElementById('placeholder').style.display = 'none';
+  }
+
+  async function translateLine(text, sourceLang, targetLang, targetEl) {
+    try {
+      const params = new URLSearchParams({ q: text, langpair: `${sourceLang}|${targetLang}` });
+      const res = await fetch(`https://api.mymemory.translated.net/get?${params}`);
+      const data = await res.json();
+      if (data.responseStatus === 200 && data.responseData && data.responseData.translatedText) {
+        targetEl.textContent = '🌐 ' + data.responseData.translatedText;
+      } else if (data.responseStatus === 403) {
+        targetEl.textContent = '🌐 Límite diario de traducción alcanzado';
+      } else {
+        targetEl.textContent = '🌐 (no se pudo traducir esta frase)';
+      }
+    } catch (err) {
+      targetEl.textContent = '🌐 (sin conexión para traducir)';
+    }
   }
 
   function addCaptionTag(icon, label) {
