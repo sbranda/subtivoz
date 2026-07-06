@@ -542,22 +542,6 @@
   .appearance-section .phrase-group-label { margin: 0; }
   .appearance-section .font-control { padding: 0; background: none; border: none; }
 
-  .color-picker-row {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  }
-  .color-swatches { display: flex; align-items: center; gap: 8px; }
-  .color-swatch {
-    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
-    cursor: pointer; touch-action: manipulation; padding: 0;
-  }
-  .color-swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--bg); }
-  #customAccentColor {
-    width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border);
-    padding: 0; cursor: pointer; background: none;
-  }
-  #customAccentColor::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
-  #customAccentColor::-webkit-color-swatch { border-radius: 50%; border: none; }
-
   /* ── TOAST ── */
   .toast {
     position: fixed; bottom: 90px; left: 50%;
@@ -855,18 +839,6 @@
         </select>
       </div>
 
-      <div class="color-picker-row">
-        <span class="font-label">Color de acento</span>
-        <div class="color-swatches" id="accentSwatches">
-          <button class="color-swatch" data-color="#00e5ff" style="background:#00e5ff;"></button>
-          <button class="color-swatch" data-color="#22c55e" style="background:#22c55e;"></button>
-          <button class="color-swatch" data-color="#f97316" style="background:#f97316;"></button>
-          <button class="color-swatch" data-color="#ec4899" style="background:#ec4899;"></button>
-          <button class="color-swatch" data-color="#eab308" style="background:#eab308;"></button>
-          <input type="color" id="customAccentColor" value="#00e5ff" title="Color personalizado">
-        </div>
-      </div>
-
       <button class="btn-secondary" style="width:100%;" onclick="resetAppearance()">↺ Restablecer apariencia</button>
     </div>
   </div>
@@ -1110,7 +1082,7 @@
     translateTargetRow.classList.toggle('show', translationEnabled);
   });
 
-  // ── Personalización de apariencia (tipografía y color de acento)
+  // ── Personalización de apariencia (tipografía)
   const FONT_STACKS = {
     syne: "'Syne', sans-serif",
     system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
@@ -1118,7 +1090,7 @@
     mono: "'Space Mono', monospace"
   };
   const APPEARANCE_KEY = 'subtivoz_appearance';
-  const DEFAULT_APPEARANCE = { font: 'syne', accent: '#00e5ff' };
+  const DEFAULT_APPEARANCE = { font: 'syne' };
 
   function loadAppearance() {
     try { return { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY) || '{}') }; }
@@ -1132,12 +1104,7 @@
 
   function applyAppearance(appearance) {
     document.documentElement.style.setProperty('--font-main', FONT_STACKS[appearance.font] || FONT_STACKS.syne);
-    document.documentElement.style.setProperty('--accent', appearance.accent);
     document.getElementById('fontFamilySelect').value = appearance.font;
-    document.getElementById('customAccentColor').value = appearance.accent;
-    document.querySelectorAll('.color-swatch').forEach(sw => {
-      sw.classList.toggle('selected', sw.dataset.color.toLowerCase() === appearance.accent.toLowerCase());
-    });
   }
 
   let currentAppearance = loadAppearance();
@@ -1145,20 +1112,6 @@
 
   document.getElementById('fontFamilySelect').addEventListener('change', (e) => {
     currentAppearance.font = e.target.value;
-    applyAppearance(currentAppearance);
-    saveAppearance(currentAppearance);
-  });
-
-  document.querySelectorAll('.color-swatch').forEach(swatch => {
-    swatch.addEventListener('click', () => {
-      currentAppearance.accent = swatch.dataset.color;
-      applyAppearance(currentAppearance);
-      saveAppearance(currentAppearance);
-    });
-  });
-
-  document.getElementById('customAccentColor').addEventListener('input', (e) => {
-    currentAppearance.accent = e.target.value;
     applyAppearance(currentAppearance);
     saveAppearance(currentAppearance);
   });
