@@ -1114,10 +1114,12 @@
       };
       utterance.onend = () => {
         document.getElementById('speakingIndicator').classList.remove('active');
+        stopSpeakingWatcher();
       };
 
       utterance.onerror = (e) => {
         document.getElementById('speakingIndicator').classList.remove('active');
+        stopSpeakingWatcher();
         // 'canceled' e 'interrupted' ocurren cuando se reemplaza la frase a propósito; no son errores reales
         if (e.error === 'canceled' || e.error === 'interrupted') return;
         if (e.error === 'language-unavailable' || e.error === 'voice-unavailable') {
@@ -1131,8 +1133,28 @@
         }
       };
 
+      // El evento 'onstart' no siempre se dispara en Android, así que mostramos
+      // el indicador de una vez y confirmamos el estado real con un chequeo directo.
+      document.getElementById('speakingIndicator').classList.add('active');
       speechSynthesis.speak(utterance);
+      startSpeakingWatcher();
     }, 120);
+  }
+
+  // Chequeo directo y confiable de si el motor de voz sigue hablando,
+  // como respaldo por si 'onstart'/'onend' no se disparan (bug conocido en Android).
+  let speakingWatcherInterval = null;
+  function startSpeakingWatcher() {
+    stopSpeakingWatcher();
+    speakingWatcherInterval = setInterval(() => {
+      if (!speechSynthesis.speaking) {
+        document.getElementById('speakingIndicator').classList.remove('active');
+        stopSpeakingWatcher();
+      }
+    }, 200);
+  }
+  function stopSpeakingWatcher() {
+    if (speakingWatcherInterval) { clearInterval(speakingWatcherInterval); speakingWatcherInterval = null; }
   }
 
   function speakCurrentText() {
@@ -1148,6 +1170,7 @@
     speakPending = false;
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     document.getElementById('speakingIndicator').classList.remove('active');
+    stopSpeakingWatcher();
   }
 
   function clearSpeakInput() {
