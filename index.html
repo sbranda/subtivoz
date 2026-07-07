@@ -2506,6 +2506,8 @@
     chatRecognition.lang = document.getElementById('langSelect').value;
 
     let chatBuffer = '';
+    let chatLastFinalChunk = '';
+    let chatLastFinalChunkTime = 0;
 
     chatRecognition.onstart = () => {
       document.getElementById('chatStatus').textContent = '🎙️ Escuchando a la otra persona...';
@@ -2514,7 +2516,28 @@
     chatRecognition.onresult = (event) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          chatBuffer += applyDictionary(event.results[i][0].transcript) + ' ';
+          const now = Date.now();
+          const trimmedT = applyDictionary(event.results[i][0].transcript).trim();
+          if (!trimmedT) continue;
+
+          // Misma corrección que en Subtítulos: evita repeticiones idénticas o crecientes
+          // (típico con audio continuo, como una tele de fondo).
+          let textToAdd = trimmedT;
+          if (chatLastFinalChunk && (now - chatLastFinalChunkTime) < 6000) {
+            const prevLower = chatLastFinalChunk.toLowerCase();
+            const currLower = trimmedT.toLowerCase();
+            if (currLower === prevLower) {
+              textToAdd = '';
+            } else if (currLower.startsWith(prevLower)) {
+              textToAdd = trimmedT.slice(chatLastFinalChunk.length).trim();
+            }
+          }
+          chatLastFinalChunk = trimmedT;
+          chatLastFinalChunkTime = now;
+
+          if (!textToAdd) continue;
+
+          chatBuffer += textToAdd + ' ';
           if (chatBuffer.length > 60) {
             addChatBubble(chatBuffer.trim(), 'them');
             chatBuffer = '';
