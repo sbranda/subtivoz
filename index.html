@@ -558,6 +558,34 @@
   .translate-target-row.show { display: flex; }
   .translate-target-row .lang-select { flex: 1; }
 
+  /* ── CUSTOM DICTIONARY ── */
+  .dictionary-section {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 12px 13px; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .dictionary-section .phrase-group-label { margin: 0; }
+  .dictionary-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .dictionary-add-row { display: flex; flex-direction: column; gap: 8px; }
+  .dictionary-add-row input {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 12px; color: var(--text); font-family: var(--font-main); font-size: 13px;
+    outline: none; width: 100%;
+  }
+  .dictionary-add-row input:focus { border-color: var(--accent); }
+  .dictionary-list { display: flex; flex-direction: column; gap: 6px; }
+  .dictionary-entry {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px;
+  }
+  .dictionary-entry-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dictionary-entry-text strong { color: var(--accent); }
+  .dictionary-entry button {
+    background: none; border: none; color: var(--danger); font-size: 16px;
+    cursor: pointer; touch-action: manipulation; flex-shrink: 0; padding: 2px 4px;
+  }
+  .dictionary-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 8px; }
+
   /* ── APPEARANCE CUSTOMIZATION ── */
   .appearance-section {
     display: flex; flex-direction: column; gap: 10px;
@@ -986,6 +1014,19 @@
     <button class="btn-secondary" style="width:100%;" onclick="openHistoryView()">🕘 Historial de sesiones</button>
 
     <button class="btn-secondary" style="width:100%;" onclick="openEmergencyConfig()">🆘 Configurar contacto de emergencia</button>
+
+    <div class="dictionary-section">
+      <div class="phrase-group-label">📝 Diccionario personalizado (nombres y palabras)</div>
+      <div class="dictionary-hint">Corrige automáticamente palabras que el reconocimiento de voz suele confundir. No "entrena" el reconocimiento — solo reemplaza el texto después de transcribirlo.</div>
+
+      <div class="dictionary-add-row">
+        <input type="text" id="dictFromInput" placeholder="Se transcribe como...">
+        <input type="text" id="dictToInput" placeholder="Corregir a...">
+        <button class="btn-secondary" onclick="addDictionaryEntry()">➕ Agregar</button>
+      </div>
+
+      <div class="dictionary-list" id="dictionaryList"></div>
+    </div>
 
     <div class="appearance-section">
       <div class="phrase-group-label">🎨 Personalizar apariencia</div>
@@ -1466,6 +1507,76 @@
     catch (err) { return null; }
   }
 
+  // ── Diccionario personalizado (corrección de nombres/palabras después de transcribir)
+  const DICTIONARY_KEY = 'subtivoz_dictionary';
+
+  function getDictionary() {
+    try { return JSON.parse(localStorage.getItem(DICTIONARY_KEY) || '[]'); }
+    catch (err) { return []; }
+  }
+
+  function saveDictionary(list) {
+    try { localStorage.setItem(DICTIONARY_KEY, JSON.stringify(list)); }
+    catch (err) { console.error('No se pudo guardar el diccionario:', err); }
+  }
+
+  function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function applyDictionary(text) {
+    if (!text) return text;
+    const dictionary = getDictionary();
+    let result = text;
+    for (const { from, to } of dictionary) {
+      if (!from) continue;
+      const re = new RegExp('\\b' + escapeRegex(from) + '\\b', 'gi');
+      result = result.replace(re, to);
+    }
+    return result;
+  }
+
+  function renderDictionaryList() {
+    const list = document.getElementById('dictionaryList');
+    const dictionary = getDictionary();
+    if (!dictionary.length) {
+      list.innerHTML = '<div class="dictionary-empty">Todavía no agregaste ninguna corrección.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    dictionary.forEach((entry, idx) => {
+      const row = document.createElement('div');
+      row.className = 'dictionary-entry';
+      row.innerHTML = `<span class="dictionary-entry-text">${escapeHtml(entry.from)} → <strong>${escapeHtml(entry.to)}</strong></span><button aria-label="Borrar">🗑️</button>`;
+      row.querySelector('button').onclick = () => deleteDictionaryEntry(idx);
+      list.appendChild(row);
+    });
+  }
+
+  function addDictionaryEntry() {
+    const fromInput = document.getElementById('dictFromInput');
+    const toInput = document.getElementById('dictToInput');
+    const from = fromInput.value.trim();
+    const to = toInput.value.trim();
+    if (!from || !to) { showToast('⚠️ Completá los dos campos'); return; }
+    const dictionary = getDictionary();
+    dictionary.push({ from, to });
+    saveDictionary(dictionary);
+    renderDictionaryList();
+    fromInput.value = '';
+    toInput.value = '';
+    showToast('✅ Corrección agregada');
+  }
+
+  function deleteDictionaryEntry(idx) {
+    const dictionary = getDictionary();
+    dictionary.splice(idx, 1);
+    saveDictionary(dictionary);
+    renderDictionaryList();
+  }
+
+  renderDictionaryList();
+
   function openEmergencyConfig() {
     const contact = getEmergencyContact();
     document.getElementById('emergencyPhone').value = contact ? contact.phone : '';
@@ -1572,7 +1683,7 @@
     recognition.onresult = (event) => {
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
+        const t = applyDictionary(event.results[i][0].transcript);
         if (event.results[i].isFinal) {
           const now = Date.now();
           const trimmedT = t.trim();
@@ -2393,7 +2504,7 @@
     chatRecognition.onresult = (event) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          chatBuffer += event.results[i][0].transcript + ' ';
+          chatBuffer += applyDictionary(event.results[i][0].transcript) + ' ';
           if (chatBuffer.length > 60) {
             addChatBubble(chatBuffer.trim(), 'them');
             chatBuffer = '';
