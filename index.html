@@ -3109,11 +3109,24 @@
 
   let vibrateWarningShown = false;
   function tryVibrate(pattern) {
-    if (!navigator.vibrate) return;
-    const accepted = navigator.vibrate(pattern);
-    if (!accepted && !vibrateWarningShown) {
-      vibrateWarningShown = true;
-      showToast('📳 El navegador rechazó la vibración — revisá Ajustes > Sonido y vibración');
+    if (!navigator.vibrate) {
+      if (!vibrateWarningShown) {
+        vibrateWarningShown = true;
+        showToast('📳 Este navegador no tiene función de vibración disponible');
+      }
+      return;
+    }
+    try {
+      const accepted = navigator.vibrate(pattern);
+      if (!accepted && !vibrateWarningShown) {
+        vibrateWarningShown = true;
+        showToast('📳 El navegador rechazó la vibración — revisá Ajustes > Sonido y vibración');
+      }
+    } catch (err) {
+      if (!vibrateWarningShown) {
+        vibrateWarningShown = true;
+        showToast('📳 Error al intentar vibrar: ' + err.message);
+      }
     }
   }
 
