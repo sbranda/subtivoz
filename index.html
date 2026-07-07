@@ -1023,6 +1023,8 @@
 
     <button class="btn-secondary" style="width:100%;" onclick="openHistoryView()">🕘 Historial de sesiones</button>
 
+    <button class="btn-secondary" style="width:100%;" onclick="downloadSubtitles()">⬇️ Descargar subtítulos (.txt)</button>
+
     <button class="btn-secondary" style="width:100%;" onclick="openEmergencyConfig()">🆘 Configurar contacto de emergencia</button>
 
     <div class="dictionary-section">
@@ -1179,12 +1181,13 @@
   </div>
   <div class="chat-status" id="chatStatus"></div>
 
-  <div class="secondary-btns-grid" style="grid-template-columns: repeat(5, 1fr); padding-bottom: 10px;">
+  <div class="secondary-btns-grid" style="grid-template-columns: repeat(3, 1fr); padding-bottom: 10px;">
     <button class="btn-secondary" onclick="clearChat()">🗑️ Limpiar</button>
     <button class="btn-secondary" onclick="copyChatText()">📋 Copiar</button>
     <button class="btn-secondary" onclick="toggleHighContrast()">🔆 Contraste</button>
     <button class="btn-secondary" onclick="shareChatText()">↗️ Compartir</button>
     <button class="btn-secondary" onclick="openHistoryView()">🕘 Historial</button>
+    <button class="btn-secondary" onclick="downloadChatText()">⬇️ Descargar</button>
   </div>
 
   <div class="meter-toggle-row" style="margin-bottom: 10px;">
@@ -1241,6 +1244,7 @@
   <div class="history-view-header">
     <h2>🕘 Historial de sesiones</h2>
     <div class="history-view-header-btns">
+      <button class="btn-secondary" onclick="downloadAllSessions()" aria-label="Descargar todo el historial">⬇️</button>
       <button class="btn-secondary" onclick="deleteAllSessions()">🗑️ Borrar todo</button>
       <button id="closeHistoryBtn" onclick="closeHistoryView()" aria-label="Cerrar historial">✕</button>
     </div>
@@ -2151,6 +2155,19 @@
     showToast('🗑️ Historial borrado');
   }
 
+  function downloadAllSessions() {
+    const sessions = getSessions();
+    if (!sessions.length) { showToast('No hay sesiones para descargar'); return; }
+    const text = sessions.map(s => {
+      const date = new Date(s.timestamp);
+      const dateStr = date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const timeStr = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      const typeLabel = s.type === 'chat' ? 'Conversación' : 'Subtítulos';
+      return `── ${typeLabel} · ${dateStr} ${timeStr} ──\n${s.text}`;
+    }).join('\n\n');
+    downloadTextFile(`subtivoz-historial-${timestampForFilename()}.txt`, text);
+  }
+
   function clearSubtitles() {
     document.getElementById('subtitleHistory').innerHTML = '';
     document.getElementById('finalText').textContent = '';
@@ -2173,6 +2190,31 @@
       document.getElementById('sessionStats').style.display = 'none';
     }
     showToast('🗑️ Pantalla limpiada');
+  }
+
+  function downloadTextFile(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('⬇️ Descargado');
+  }
+
+  function timestampForFilename() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  }
+
+  function downloadSubtitles() {
+    const text = allText.trim();
+    if (!text) { showToast('No hay texto para descargar'); return; }
+    downloadTextFile(`subtivoz-subtitulos-${timestampForFilename()}.txt`, text);
   }
 
   function copyText() {
@@ -2729,6 +2771,12 @@
     } else {
       copyChatText();
     }
+  }
+
+  function downloadChatText() {
+    const text = getChatText();
+    if (!text) { showToast('No hay conversación para descargar'); return; }
+    downloadTextFile(`subtivoz-chat-${timestampForFilename()}.txt`, text);
   }
 
   // ── Sound pattern detection (YAMNet via TensorFlow.js)
