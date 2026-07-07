@@ -754,6 +754,29 @@
   #chatSendBtn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #000; }
   #chatMicBtn { background: var(--card); border: 1px solid var(--border); color: var(--text); }
   #chatMicBtn.listening { background: var(--danger); color: #fff; border-color: transparent; animation: stopPulse 2s ease-in-out infinite; }
+  #chatEmojiBtn {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    cursor: pointer; touch-action: manipulation; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #chatEmojiBtn.open { border-color: var(--accent); background: rgba(0,229,255,0.1); }
+
+  .emoji-panel {
+    display: none; flex-wrap: wrap; gap: 6px;
+    max-height: 140px; overflow-y: auto; padding: 10px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    margin-bottom: 10px;
+    -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+  }
+  .emoji-panel.show { display: flex; }
+  .emoji-btn {
+    width: 38px; height: 38px; border-radius: 10px; border: none;
+    background: var(--surface); font-size: 20px; cursor: pointer;
+    touch-action: manipulation; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .emoji-btn:active { background: rgba(0,229,255,0.15); }
 
   /* ── CAMERA OVERLAY CAPTION MODE ── */
   #cameraView {
@@ -1126,7 +1149,35 @@
     <select class="lang-select" id="chatTranslateTarget"></select>
   </div>
 
+  <div class="emoji-panel" id="emojiPanel">
+    <button class="emoji-btn" onclick="insertEmoji('😀')">😀</button>
+    <button class="emoji-btn" onclick="insertEmoji('😂')">😂</button>
+    <button class="emoji-btn" onclick="insertEmoji('🥰')">🥰</button>
+    <button class="emoji-btn" onclick="insertEmoji('😍')">😍</button>
+    <button class="emoji-btn" onclick="insertEmoji('😊')">😊</button>
+    <button class="emoji-btn" onclick="insertEmoji('😉')">😉</button>
+    <button class="emoji-btn" onclick="insertEmoji('😅')">😅</button>
+    <button class="emoji-btn" onclick="insertEmoji('😴')">😴</button>
+    <button class="emoji-btn" onclick="insertEmoji('😢')">😢</button>
+    <button class="emoji-btn" onclick="insertEmoji('😮')">😮</button>
+    <button class="emoji-btn" onclick="insertEmoji('😡')">😡</button>
+    <button class="emoji-btn" onclick="insertEmoji('🤔')">🤔</button>
+    <button class="emoji-btn" onclick="insertEmoji('👍')">👍</button>
+    <button class="emoji-btn" onclick="insertEmoji('👎')">👎</button>
+    <button class="emoji-btn" onclick="insertEmoji('🙏')">🙏</button>
+    <button class="emoji-btn" onclick="insertEmoji('👏')">👏</button>
+    <button class="emoji-btn" onclick="insertEmoji('🙌')">🙌</button>
+    <button class="emoji-btn" onclick="insertEmoji('❤️')">❤️</button>
+    <button class="emoji-btn" onclick="insertEmoji('🔥')">🔥</button>
+    <button class="emoji-btn" onclick="insertEmoji('🎉')">🎉</button>
+    <button class="emoji-btn" onclick="insertEmoji('💯')">💯</button>
+    <button class="emoji-btn" onclick="insertEmoji('✅')">✅</button>
+    <button class="emoji-btn" onclick="insertEmoji('❌')">❌</button>
+    <button class="emoji-btn" onclick="insertEmoji('❓')">❓</button>
+  </div>
+
   <div class="chat-input-row">
+    <button id="chatEmojiBtn" onclick="toggleEmojiPanel()">😀</button>
     <button id="chatMicBtn" onclick="toggleChatMic()">🎙️</button>
     <input type="text" id="chatInput" placeholder="Escribí tu respuesta...">
     <button id="chatSendBtn" onclick="sendChatMessage()">➤</button>
@@ -1328,6 +1379,8 @@
   let speakerIdEnabled = false;
   let currentSpeakerNum = 1;
   let lastFinalEndTime = null;
+  let lastFinalChunk = '';
+  let lastFinalChunkTime = 0;
   const TURN_PAUSE_MS = 1200; // gap that counts as a possible speaker change
 
   const speakerToggle = document.getElementById('speakerToggle');
@@ -1522,6 +1575,17 @@
         const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           const now = Date.now();
+          const trimmedT = t.trim();
+
+          // El motor de reconocimiento en Android a veces repite el último resultado
+          // al reiniciarse solo. Si es el mismo texto que se acaba de agregar hace instantes, lo salteamos.
+          if (trimmedT && trimmedT === lastFinalChunk && (now - lastFinalChunkTime) < 4000) {
+            lastFinalChunkTime = now;
+            continue;
+          }
+          lastFinalChunk = trimmedT;
+          lastFinalChunkTime = now;
+
           if (speakerIdEnabled && lastFinalEndTime !== null && (now - lastFinalEndTime) > TURN_PAUSE_MS && finalTranscript.trim()) {
             // Pausa larga detectada: cerramos el bloque con el hablante anterior y cambiamos
             addToHistory(finalTranscript.trim(), currentSpeakerNum);
@@ -1642,6 +1706,8 @@
     if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
     if (!setupRecognition()) return;
     isListening = true;
+    lastFinalChunk = '';
+    lastFinalChunkTime = 0;
     try { recognition.start(); } catch(e) { showToast('Error al iniciar micrófono'); isListening = false; return; }
     if (isMeterEnabled) startVolumeMeter();
     if (isCaptionTagsEnabled) startCaptionTagDetection();
@@ -2400,6 +2466,23 @@
     if (isChatListening) pauseChatMicForSpeech();
     speak(text);
     input.value = '';
+  }
+
+  function toggleEmojiPanel() {
+    const panel = document.getElementById('emojiPanel');
+    const btn = document.getElementById('chatEmojiBtn');
+    const isOpen = panel.classList.toggle('show');
+    btn.classList.toggle('open', isOpen);
+  }
+
+  function insertEmoji(emoji) {
+    const input = document.getElementById('chatInput');
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+    const newPos = start + emoji.length;
+    input.focus();
+    input.setSelectionRange(newPos, newPos);
   }
 
   document.getElementById('chatInput').addEventListener('keydown', (e) => {
