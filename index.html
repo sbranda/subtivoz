@@ -229,6 +229,24 @@
     font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px;
   }
 
+  .speak-log-panel {
+    display: none; flex-direction: column; gap: 8px;
+    max-height: 160px; margin-bottom: 10px;
+  }
+  .speak-log-panel.show { display: flex; }
+  .speak-log-list {
+    flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;
+    display: flex; flex-direction: column; gap: 6px; min-height: 0;
+    -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+  }
+  .speak-log-list::-webkit-scrollbar { display: none; }
+  .speak-log-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 10px; }
+  .speak-log-line {
+    font-size: 13px; padding: 7px 10px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; display: flex; align-items: baseline; gap: 8px; flex-shrink: 0;
+  }
+  .speak-log-time { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; flex-shrink: 0; }
+
   .phrase-group-label {
     font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
     letter-spacing: 0.8px; font-family: 'Space Mono', monospace;
@@ -1083,6 +1101,21 @@
         <div class="wave-bar"></div><div class="wave-bar"></div>
       </div>
       <span id="speakingLabel">🔊 Hablando...</span>
+    </div>
+
+    <button class="advanced-toggle-btn" onclick="toggleSpeakLog()">
+      📜 Historial de lo dicho <span id="speakLogChevron">▾</span>
+    </button>
+    <div class="speak-log-panel" id="speakLogPanel">
+      <div class="secondary-btns-grid" style="grid-template-columns: repeat(4, 1fr);">
+        <button class="btn-secondary" onclick="clearSpeakLog()">🗑️ Limpiar</button>
+        <button class="btn-secondary" onclick="copySpeakLog()">📋 Copiar</button>
+        <button class="btn-secondary" onclick="downloadSpeakLog()">⬇️ Descargar</button>
+        <button class="btn-secondary" onclick="shareSpeakLog()">↗️ Compartir</button>
+      </div>
+      <div class="speak-log-list" id="speakLogList">
+        <div class="speak-log-empty" id="speakLogEmpty">Todavía no dijiste nada en esta sesión.</div>
+      </div>
     </div>
 
     <div class="quick-phrases-scroll">
@@ -2090,6 +2123,80 @@
     saveSessions(sessions);
   }
 
+  // ── Historial de frases dichas en la pestaña Hablar
+  let speakSessionId = null;
+  let spokenPhrases = [];
+
+  function upsertSpeakSession() {
+    const text = spokenPhrases.join('\n');
+    if (!speakSessionId || !text.trim()) return;
+    const sessions = getSessions();
+    const idx = sessions.findIndex(s => s.id === speakSessionId);
+    const wc = text.trim().split(/\s+/).filter(Boolean).length;
+    const entry = { id: speakSessionId, type: 'speak', timestamp: new Date(speakSessionId).toISOString(), wordCount: wc, text };
+    if (idx >= 0) sessions[idx] = entry; else sessions.unshift(entry);
+    while (sessions.length > MAX_SESSIONS) sessions.pop();
+    saveSessions(sessions);
+  }
+
+  function logSpokenPhrase(text) {
+    if (!text || !text.trim()) return;
+    if (!speakSessionId) speakSessionId = Date.now();
+
+    const empty = document.getElementById('speakLogEmpty');
+    if (empty) empty.remove();
+
+    spokenPhrases.push(text.trim());
+    const list = document.getElementById('speakLogList');
+    const line = document.createElement('div');
+    line.className = 'speak-log-line';
+    const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    line.innerHTML = `<span class="speak-log-time">${time}</span><span>${escapeHtml(text.trim())}</span>`;
+    list.appendChild(line);
+    list.scrollTop = list.scrollHeight;
+
+    upsertSpeakSession();
+  }
+
+  function toggleSpeakLog() {
+    const panel = document.getElementById('speakLogPanel');
+    const btn = document.querySelector('#speakView .advanced-toggle-btn');
+    const isOpen = panel.classList.toggle('show');
+    btn.classList.toggle('open', isOpen);
+  }
+
+  function clearSpeakLog() {
+    spokenPhrases = [];
+    document.getElementById('speakLogList').innerHTML = '<div class="speak-log-empty" id="speakLogEmpty">Todavía no dijiste nada en esta sesión.</div>';
+    if (speakSessionId) {
+      saveSessions(getSessions().filter(s => s.id !== speakSessionId));
+      speakSessionId = null;
+    }
+    showToast('🗑️ Historial de voz limpiado');
+  }
+
+  function copySpeakLog() {
+    const text = spokenPhrases.join('\n');
+    if (!text.trim()) { showToast('No hay nada para copiar'); return; }
+    navigator.clipboard ? navigator.clipboard.writeText(text).then(() => showToast('📋 Copiado')) : showToast('Copia no disponible');
+  }
+
+  function downloadSpeakLog() {
+    const text = spokenPhrases.join('\n');
+    if (!text.trim()) { showToast('No hay nada para descargar'); return; }
+    downloadTextFile(`subtivoz-hablar-${timestampForFilename()}.txt`, text);
+  }
+
+  function shareSpeakLog() {
+    const text = spokenPhrases.join('\n');
+    if (!text.trim()) { showToast('No hay nada para compartir'); return; }
+    if (navigator.share) {
+      navigator.share({ title: 'SubtiVoz - Frases dichas', text }).catch(() => {});
+    } else {
+      copySpeakLog();
+    }
+  }
+
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -2121,7 +2228,7 @@
 
       const card = document.createElement('div');
       card.className = 'history-session-card';
-      const typeIcon = s.type === 'chat' ? '💬' : '🎙️';
+      const typeIcon = s.type === 'chat' ? '💬' : s.type === 'speak' ? '🗣️' : '🎙️';
       card.innerHTML = `
         <div class="history-session-meta">
           <span>${typeIcon} ${dateStr} · ${timeStr}</span>
@@ -2495,12 +2602,15 @@
   }
 
   function speakCurrentText() {
-    speak(document.getElementById('speakInput').value);
+    const text = document.getElementById('speakInput').value;
+    speak(text);
+    logSpokenPhrase(text);
   }
 
   function quickSpeak(phrase) {
     document.getElementById('speakInput').value = phrase;
     speak(phrase);
+    logSpokenPhrase(phrase);
   }
 
   function stopSpeaking() {
