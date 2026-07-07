@@ -1167,6 +1167,8 @@
         <button class="quick-phrase-btn" onclick="quickSpeak('Llame al 911 por favor, es una emergencia')"><img class="picto-img" data-word="emergencia" alt=""><span>Llame al 911</span></button>
         <button class="quick-phrase-btn" onclick="quickSpeak('Tengo una alergia')"><img class="picto-img" data-word="alergia" alt=""><span>Tengo una alergia</span></button>
       </div>
+
+      <button class="btn-secondary" id="addPhraseBtn" style="width:100%; margin-top:4px;" onclick="openAddPhraseModal()">➕ Agregar frase</button>
     </div>
   </div>
 
@@ -1314,6 +1316,32 @@
       <button class="btn-secondary" onclick="closeEmergencyConfig()">Cancelar</button>
       <button class="main-btn btn-start" onclick="saveEmergencyContact()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<div id="addPhraseModal" style="display:none;">
+  <div class="modal-card">
+    <h3>➕ Agregar frase</h3>
+    <label class="modal-label">Frase a decir</label>
+    <input type="text" id="newPhraseText" placeholder="Ej: Quiero un café">
+    <label class="modal-label">Categoría</label>
+    <select id="newPhraseCategory" class="lang-select" style="width:100%;">
+      <option value="Saludos">Saludos</option>
+      <option value="Comunicación">Comunicación</option>
+      <option value="Respuestas rápidas">Respuestas rápidas</option>
+      <option value="Necesidades">Necesidades</option>
+      <option value="Salud y emergencia">Salud y emergencia</option>
+      <option value="__new__">➕ Nueva categoría...</option>
+    </select>
+    <input type="text" id="newCategoryInput" placeholder="Nombre de la nueva categoría" style="display:none;">
+    <label class="modal-label">Palabra para el pictograma (opcional)</label>
+    <input type="text" id="newPhraseKeyword" placeholder="Si lo dejás vacío, usa la frase entera">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeAddPhraseModal()">Cerrar</button>
+      <button class="main-btn btn-start" onclick="saveNewPhrase()">➕ Agregar</button>
+    </div>
+    <div class="phrase-group-label" style="margin-top:6px;">Tus frases agregadas</div>
+    <div class="dictionary-list" id="customPhrasesManageList"></div>
   </div>
 </div>
 
@@ -1647,6 +1675,127 @@
       showToast('⚠️ No se pudo guardar el contacto');
     }
   }
+
+  // ── Frases personalizadas (con categorías nuevas o existentes) en la pestaña Hablar
+  const CUSTOM_PHRASES_KEY = 'subtivoz_custom_phrases';
+
+  function getCustomPhrases() {
+    try { return JSON.parse(localStorage.getItem(CUSTOM_PHRASES_KEY) || '[]'); }
+    catch (err) { return []; }
+  }
+
+  function saveCustomPhrases(list) {
+    try { localStorage.setItem(CUSTOM_PHRASES_KEY, JSON.stringify(list)); }
+    catch (err) { console.error('No se pudieron guardar las frases:', err); }
+  }
+
+  function openAddPhraseModal() {
+    renderCustomPhrasesManageList();
+    document.getElementById('newPhraseCategory').value = 'Saludos';
+    document.getElementById('newCategoryInput').style.display = 'none';
+    document.getElementById('addPhraseModal').style.display = 'flex';
+  }
+
+  function closeAddPhraseModal() {
+    document.getElementById('addPhraseModal').style.display = 'none';
+  }
+
+  document.getElementById('newPhraseCategory').addEventListener('change', (e) => {
+    document.getElementById('newCategoryInput').style.display = e.target.value === '__new__' ? 'block' : 'none';
+  });
+
+  function saveNewPhrase() {
+    const text = document.getElementById('newPhraseText').value.trim();
+    let category = document.getElementById('newPhraseCategory').value;
+    if (category === '__new__') category = document.getElementById('newCategoryInput').value.trim();
+    const keyword = document.getElementById('newPhraseKeyword').value.trim() || text;
+
+    if (!text || !category) { showToast('⚠️ Completá la frase y la categoría'); return; }
+
+    const list = getCustomPhrases();
+    list.push({ id: Date.now(), category, text, keyword });
+    saveCustomPhrases(list);
+    renderCustomPhraseCards();
+    renderCustomPhrasesManageList();
+    document.getElementById('newPhraseText').value = '';
+    document.getElementById('newPhraseKeyword').value = '';
+    showToast('✅ Frase agregada');
+  }
+
+  function deleteCustomPhrase(id) {
+    const list = getCustomPhrases().filter(p => p.id !== id);
+    saveCustomPhrases(list);
+    renderCustomPhraseCards();
+    renderCustomPhrasesManageList();
+  }
+
+  function renderCustomPhrasesManageList() {
+    const list = getCustomPhrases();
+    const container = document.getElementById('customPhrasesManageList');
+    if (!list.length) {
+      container.innerHTML = '<div class="dictionary-empty">Todavía no agregaste frases propias.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    list.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'dictionary-entry';
+      row.innerHTML = `<span class="dictionary-entry-text">${escapeHtml(p.category)}: <strong>${escapeHtml(p.text)}</strong></span><button aria-label="Borrar frase">🗑️</button>`;
+      row.querySelector('button').onclick = () => deleteCustomPhrase(p.id);
+      container.appendChild(row);
+    });
+  }
+
+  function renderCustomPhraseCards() {
+    document.querySelectorAll('.custom-phrase-btn').forEach(el => el.remove());
+    document.querySelectorAll('.custom-phrase-group-label').forEach(el => el.remove());
+    document.querySelectorAll('.custom-phrase-group').forEach(el => el.remove());
+
+    const list = getCustomPhrases();
+    const byCategory = {};
+    list.forEach(p => {
+      if (!byCategory[p.category]) byCategory[p.category] = [];
+      byCategory[p.category].push(p);
+    });
+
+    const scroll = document.querySelector('#speakView .quick-phrases-scroll');
+    const addBtn = document.getElementById('addPhraseBtn');
+
+    Object.entries(byCategory).forEach(([category, phrases]) => {
+      const labels = Array.from(scroll.querySelectorAll('.phrase-group-label'));
+      const existingLabel = labels.find(l => l.textContent.trim() === category);
+      let targetContainer;
+      if (existingLabel) {
+        targetContainer = existingLabel.nextElementSibling;
+      } else {
+        const newLabel = document.createElement('div');
+        newLabel.className = 'phrase-group-label custom-phrase-group-label';
+        newLabel.textContent = category;
+        const newGroup = document.createElement('div');
+        newGroup.className = 'quick-phrases custom-phrase-group';
+        scroll.insertBefore(newLabel, addBtn);
+        scroll.insertBefore(newGroup, addBtn);
+        targetContainer = newGroup;
+      }
+      phrases.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'quick-phrase-btn custom-phrase-btn';
+        btn.onclick = () => quickSpeak(p.text);
+        const img = document.createElement('img');
+        img.className = 'picto-img';
+        img.dataset.word = p.keyword;
+        img.alt = '';
+        const span = document.createElement('span');
+        span.textContent = p.text;
+        btn.appendChild(img);
+        btn.appendChild(span);
+        targetContainer.appendChild(btn);
+        loadPictogram(p.keyword, img);
+      });
+    });
+  }
+
+  renderCustomPhraseCards();
 
   function triggerEmergency() {
     const contact = getEmergencyContact();
