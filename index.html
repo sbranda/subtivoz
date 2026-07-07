@@ -1687,15 +1687,25 @@
         if (event.results[i].isFinal) {
           const now = Date.now();
           const trimmedT = t.trim();
+          if (!trimmedT) continue;
 
-          // El motor de reconocimiento en Android a veces repite el último resultado
-          // al reiniciarse solo. Si es el mismo texto que se acaba de agregar hace instantes, lo salteamos.
-          if (trimmedT && trimmedT === lastFinalChunk && (now - lastFinalChunkTime) < 4000) {
-            lastFinalChunkTime = now;
-            continue;
+          // Con audio continuo (como una tele) el motor a veces "re-cierra" el mismo
+          // fragmento un poco más largo cada vez, en vez de repetirlo idéntico.
+          // Si el nuevo texto empieza igual que el anterior, nos quedamos solo con lo nuevo al final.
+          let textToAdd = trimmedT;
+          if (lastFinalChunk && (now - lastFinalChunkTime) < 6000) {
+            const prevLower = lastFinalChunk.toLowerCase();
+            const currLower = trimmedT.toLowerCase();
+            if (currLower === prevLower) {
+              textToAdd = ''; // repetición exacta
+            } else if (currLower.startsWith(prevLower)) {
+              textToAdd = trimmedT.slice(lastFinalChunk.length).trim(); // solo la parte nueva
+            }
           }
           lastFinalChunk = trimmedT;
           lastFinalChunkTime = now;
+
+          if (!textToAdd) continue;
 
           const longPause = lastFinalEndTime !== null && (now - lastFinalEndTime) > TURN_PAUSE_MS;
           if (longPause && finalTranscript.trim()) {
@@ -1708,8 +1718,8 @@
             }
           }
           lastFinalEndTime = now;
-          finalTranscript += t + ' ';
-          allText += t + ' ';
+          finalTranscript += textToAdd + ' ';
+          allText += textToAdd + ' ';
           wordCount = allText.trim().split(/\s+/).filter(Boolean).length;
           document.getElementById('wordsStat').textContent = wordCount + ' palabras';
           if (finalTranscript.length > 100) {
