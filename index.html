@@ -1586,12 +1586,15 @@
           lastFinalChunk = trimmedT;
           lastFinalChunkTime = now;
 
-          if (speakerIdEnabled && lastFinalEndTime !== null && (now - lastFinalEndTime) > TURN_PAUSE_MS && finalTranscript.trim()) {
-            // Pausa larga detectada: cerramos el bloque con el hablante anterior y cambiamos
+          const longPause = lastFinalEndTime !== null && (now - lastFinalEndTime) > TURN_PAUSE_MS;
+          if (longPause && finalTranscript.trim()) {
+            // Pausa larga detectada: cerramos el bloque acá (así se traduce ya, sin esperar a juntar más texto)
             addToHistory(finalTranscript.trim(), currentSpeakerNum);
             finalTranscript = '';
-            currentSpeakerNum = currentSpeakerNum === 1 ? 2 : 1;
-            updateLiveSpeakerTag();
+            if (speakerIdEnabled) {
+              currentSpeakerNum = currentSpeakerNum === 1 ? 2 : 1;
+              updateLiveSpeakerTag();
+            }
           }
           lastFinalEndTime = now;
           finalTranscript += t + ' ';
