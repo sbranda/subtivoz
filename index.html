@@ -240,11 +240,20 @@
     display: flex; flex-wrap: wrap; gap: 8px;
   }
   .quick-phrase-btn {
-    padding: 8px 14px; border-radius: 100px; border: 1px solid var(--border);
+    width: 82px; padding: 8px 6px 7px; border-radius: 14px; border: 1px solid var(--border);
     background: var(--card); color: var(--text); font-family: var(--font-main);
-    font-size: 13px; font-weight: 600; cursor: pointer; touch-action: manipulation;
+    cursor: pointer; touch-action: manipulation;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
   }
   .quick-phrase-btn:active { background: rgba(0,229,255,0.08); border-color: var(--accent); color: var(--accent); }
+  .quick-phrase-btn span {
+    font-size: 11px; font-weight: 600; text-align: center; line-height: 1.25;
+  }
+  .picto-img {
+    width: 56px; height: 56px; object-fit: contain;
+    background: #fff; border-radius: 8px; padding: 3px; flex-shrink: 0;
+  }
+  .picto-img:not([src]) { background: var(--surface); }
 
   .btn-stop-speak { background: linear-gradient(135deg, var(--danger), #dc2626); color: #fff; }
 
@@ -1077,51 +1086,51 @@
     <div class="quick-phrases-scroll">
       <div class="phrase-group-label">Saludos</div>
       <div class="quick-phrases">
-        <button class="quick-phrase-btn" onclick="quickSpeak('Hola')">Hola</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Buenos días')">Buenos días</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Buenas tardes')">Buenas tardes</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Buenas noches')">Buenas noches</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Chau, que tengas buen día')">Chau</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Hola')"><img class="picto-img" data-word="hola" alt=""><span>Hola</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Buenos días')"><img class="picto-img" data-word="buenos días" alt=""><span>Buenos días</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Buenas tardes')"><img class="picto-img" data-word="tarde" alt=""><span>Buenas tardes</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Buenas noches')"><img class="picto-img" data-word="noche" alt=""><span>Buenas noches</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Chau, que tengas buen día')"><img class="picto-img" data-word="adiós" alt=""><span>Chau</span></button>
       </div>
 
       <div class="phrase-group-label">Comunicación</div>
       <div class="quick-phrases">
-        <button class="quick-phrase-btn" onclick="quickSpeak('Un momento por favor')">Un momento por favor</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('¿Puede repetir, por favor?')">¿Puede repetir?</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('No escucho, hábleme despacio')">No escucho, hábleme despacio</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Soy sordo o sorda, me comunico por escrito o con esta app')">Soy sordo/a</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('No entiendo, ¿puede escribirlo?')">¿Puede escribirlo?</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('No entiendo')">No entiendo</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Un momento por favor')"><img class="picto-img" data-word="esperar" alt=""><span>Un momento</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Puede repetir, por favor?')"><img class="picto-img" data-word="repetir" alt=""><span>¿Puede repetir?</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No escucho, hábleme despacio')"><img class="picto-img" data-word="escuchar" alt=""><span>Hábleme despacio</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Soy sordo o sorda, me comunico por escrito o con esta app')"><img class="picto-img" data-word="sordo" alt=""><span>Soy sordo/a</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No entiendo, ¿puede escribirlo?')"><img class="picto-img" data-word="escribir" alt=""><span>¿Puede escribirlo?</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No entiendo')"><img class="picto-img" data-word="no entender" alt=""><span>No entiendo</span></button>
       </div>
 
       <div class="phrase-group-label">Respuestas rápidas</div>
       <div class="quick-phrases">
-        <button class="quick-phrase-btn" onclick="quickSpeak('Sí')">Sí</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('No')">No</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Por favor')">Por favor</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Gracias')">Gracias</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('De nada')">De nada</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Perdón, disculpe')">Perdón</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Está bien')">Está bien</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Sí')"><img class="picto-img" data-word="sí" alt=""><span>Sí</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No')"><img class="picto-img" data-word="no" alt=""><span>No</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Por favor')"><img class="picto-img" data-word="por favor" alt=""><span>Por favor</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Gracias')"><img class="picto-img" data-word="gracias" alt=""><span>Gracias</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('De nada')"><img class="picto-img" data-word="de nada" alt=""><span>De nada</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Perdón, disculpe')"><img class="picto-img" data-word="perdón" alt=""><span>Perdón</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Está bien')"><img class="picto-img" data-word="bien" alt=""><span>Está bien</span></button>
       </div>
 
       <div class="phrase-group-label">Necesidades</div>
       <div class="quick-phrases">
-        <button class="quick-phrase-btn" onclick="quickSpeak('Necesito ayuda, por favor')">Necesito ayuda</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('¿Dónde está el baño?')">¿Dónde está el baño?</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo hambre')">Tengo hambre</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo sed')">Tengo sed</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Estoy bien, gracias')">Estoy bien</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('¿Cuánto cuesta?')">¿Cuánto cuesta?</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('¿Acepta tarjeta?')">¿Acepta tarjeta?</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Necesito ayuda, por favor')"><img class="picto-img" data-word="ayuda" alt=""><span>Necesito ayuda</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Dónde está el baño?')"><img class="picto-img" data-word="baño" alt=""><span>¿Dónde está el baño?</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo hambre')"><img class="picto-img" data-word="hambre" alt=""><span>Tengo hambre</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo sed')"><img class="picto-img" data-word="sed" alt=""><span>Tengo sed</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Estoy bien, gracias')"><img class="picto-img" data-word="bien" alt=""><span>Estoy bien</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Cuánto cuesta?')"><img class="picto-img" data-word="dinero" alt=""><span>¿Cuánto cuesta?</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('¿Acepta tarjeta?')"><img class="picto-img" data-word="tarjeta de crédito" alt=""><span>¿Acepta tarjeta?</span></button>
       </div>
 
       <div class="phrase-group-label">Salud y emergencia</div>
       <div class="quick-phrases">
-        <button class="quick-phrase-btn" onclick="quickSpeak('No me siento bien')">No me siento bien</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Necesito un médico, por favor')">Necesito un médico</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Llame al 911 por favor, es una emergencia')">Llame al 911</button>
-        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo una alergia')">Tengo una alergia</button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('No me siento bien')"><img class="picto-img" data-word="enfermo" alt=""><span>No me siento bien</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Necesito un médico, por favor')"><img class="picto-img" data-word="médico" alt=""><span>Necesito un médico</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Llame al 911 por favor, es una emergencia')"><img class="picto-img" data-word="emergencia" alt=""><span>Llame al 911</span></button>
+        <button class="quick-phrase-btn" onclick="quickSpeak('Tengo una alergia')"><img class="picto-img" data-word="alergia" alt=""><span>Tengo una alergia</span></button>
       </div>
     </div>
   </div>
@@ -2462,6 +2471,54 @@
   function clearSpeakInput() {
     document.getElementById('speakInput').value = '';
   }
+
+  // ── Pictogramas ARASAAC para las frases rápidas (imagen + palabra)
+  const PICTO_CACHE_KEY = 'subtivoz_picto_cache';
+
+  function getPictoCache() {
+    try { return JSON.parse(localStorage.getItem(PICTO_CACHE_KEY) || '{}'); }
+    catch (err) { return {}; }
+  }
+
+  function savePictoCache(cache) {
+    try { localStorage.setItem(PICTO_CACHE_KEY, JSON.stringify(cache)); }
+    catch (err) { /* si se llena el storage, no pasa nada grave, seguimos sin cachear */ }
+  }
+
+  async function loadPictogram(word, imgEl) {
+    const cache = getPictoCache();
+    if (cache[word]) {
+      if (cache[word] === 'missing') { imgEl.remove(); return; }
+      imgEl.src = cache[word];
+      return;
+    }
+    try {
+      const res = await fetch(`https://api.arasaac.org/api/pictograms/es/search/${encodeURIComponent(word)}`);
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0 && data[0]._id) {
+        const url = `https://static.arasaac.org/pictograms/${data[0]._id}/${data[0]._id}_300.png`;
+        imgEl.src = url;
+        const c = getPictoCache();
+        c[word] = url;
+        savePictoCache(c);
+      } else {
+        const c = getPictoCache();
+        c[word] = 'missing';
+        savePictoCache(c);
+        imgEl.remove();
+      }
+    } catch (err) {
+      // Sin internet o falló la API: dejamos la tarjeta sin imagen, solo con la palabra
+      imgEl.remove();
+    }
+  }
+
+  function loadAllPictograms() {
+    document.querySelectorAll('.picto-img[data-word]').forEach(img => {
+      loadPictogram(img.dataset.word, img);
+    });
+  }
+  loadAllPictograms();
 
   // ── Modo Conversación (chat con burbujas + traducción)
   let chatRecognition = null;
