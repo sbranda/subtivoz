@@ -1046,6 +1046,14 @@
     <button class="btn-secondary" style="width:100%;" onclick="openEmergencyConfig()">🆘 Configurar contacto de emergencia</button>
 
     <div class="dictionary-section">
+      <div class="phrase-group-label">💾 Copia de seguridad</div>
+      <div class="dictionary-hint">Exportá toda tu configuración (diccionario, frases, apariencia, contacto de emergencia e historial) a un archivo, para pasarla a otro celular o tablet.</div>
+      <button class="btn-secondary" style="width:100%;" onclick="exportSettings()">⬇️ Exportar configuración</button>
+      <button class="btn-secondary" style="width:100%;" onclick="triggerImportSettings()">⬆️ Importar configuración</button>
+      <input type="file" id="importSettingsInput" accept="application/json,.json" style="display:none;" onchange="importSettingsFile(event)">
+    </div>
+
+    <div class="dictionary-section">
       <div class="phrase-group-label">📝 Diccionario personalizado (nombres y palabras)</div>
       <div class="dictionary-hint">Corrige automáticamente palabras que el reconocimiento de voz suele confundir. No "entrena" el reconocimiento — solo reemplaza el texto después de transcribirlo.</div>
 
@@ -2470,6 +2478,52 @@
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  }
+
+  // ── Exportar / importar toda la configuración (para pasarla a otro dispositivo)
+  const EXPORTABLE_KEYS = {
+    subtivoz_appearance: 'Apariencia',
+    subtivoz_emergency: 'Contacto de emergencia',
+    subtivoz_dictionary: 'Diccionario personalizado',
+    subtivoz_custom_phrases: 'Frases personalizadas',
+    subtivoz_sessions: 'Historial de sesiones'
+  };
+
+  function exportSettings() {
+    const data = { __app: 'SubtiVoz', __exportedAt: new Date().toISOString() };
+    let count = 0;
+    Object.keys(EXPORTABLE_KEYS).forEach(key => {
+      const val = localStorage.getItem(key);
+      if (val !== null) { data[key] = val; count++; }
+    });
+    if (!count) { showToast('No hay configuración guardada todavía para exportar'); return; }
+    downloadTextFile(`subtivoz-configuracion-${timestampForFilename()}.json`, JSON.stringify(data, null, 2));
+  }
+
+  function triggerImportSettings() {
+    document.getElementById('importSettingsInput').click();
+  }
+
+  function importSettingsFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        let count = 0;
+        Object.keys(EXPORTABLE_KEYS).forEach(key => {
+          if (typeof data[key] === 'string') { localStorage.setItem(key, data[key]); count++; }
+        });
+        if (!count) { showToast('⚠️ El archivo no tiene configuración de SubtiVoz reconocible'); return; }
+        showToast(`✅ Configuración importada (${count} secciones) — recargando...`);
+        setTimeout(() => window.location.reload(), 1200);
+      } catch (err) {
+        showToast('⚠️ El archivo no es válido');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
   }
 
   function downloadSubtitles() {
