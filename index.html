@@ -1096,12 +1096,6 @@
         </select>
       </div>
 
-      <div class="font-control">
-        <span class="font-label">Tamaño interfaz</span>
-        <input type="range" class="font-slider" id="uiScaleSlider" min="90" max="140" value="100">
-        <span class="font-value" id="uiScaleValue">100%</span>
-      </div>
-
       <div class="color-picker-row">
         <span class="font-label">Color de acento</span>
         <div class="color-swatches" id="accentSwatches">
@@ -1544,7 +1538,7 @@
     tag.style.display = 'inline-block';
   }
 
-  // ── Personalización de apariencia (tipografía, tamaño de interfaz y color de acento)
+  // ── Personalización de apariencia (tipografía y color de acento)
   const FONT_STACKS = {
     syne: "'Syne', sans-serif",
     system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
@@ -1554,7 +1548,7 @@
     mono: "'Space Mono', monospace"
   };
   const APPEARANCE_KEY = 'subtivoz_appearance';
-  const DEFAULT_APPEARANCE = { font: 'syne', accent: '#00e5ff', uiScale: 100 };
+  const DEFAULT_APPEARANCE = { font: 'syne', accent: '#00e5ff' };
 
   function loadAppearance() {
     try { return { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY) || '{}') }; }
@@ -1569,11 +1563,8 @@
   function applyAppearance(appearance) {
     document.documentElement.style.setProperty('--font-main', FONT_STACKS[appearance.font] || FONT_STACKS.syne);
     document.documentElement.style.setProperty('--accent', appearance.accent);
-    document.body.style.zoom = (appearance.uiScale || 100) / 100;
     document.getElementById('fontFamilySelect').value = appearance.font;
     document.getElementById('customAccentColor').value = appearance.accent;
-    document.getElementById('uiScaleSlider').value = appearance.uiScale || 100;
-    document.getElementById('uiScaleValue').textContent = (appearance.uiScale || 100) + '%';
     document.querySelectorAll('.color-swatch').forEach(sw => {
       sw.classList.toggle('selected', sw.dataset.color.toLowerCase() === appearance.accent.toLowerCase());
     });
@@ -1584,12 +1575,6 @@
 
   document.getElementById('fontFamilySelect').addEventListener('change', (e) => {
     currentAppearance.font = e.target.value;
-    applyAppearance(currentAppearance);
-    saveAppearance(currentAppearance);
-  });
-
-  document.getElementById('uiScaleSlider').addEventListener('input', (e) => {
-    currentAppearance.uiScale = parseInt(e.target.value, 10);
     applyAppearance(currentAppearance);
     saveAppearance(currentAppearance);
   });
