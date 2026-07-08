@@ -3203,49 +3203,12 @@
     }
   }
 
-  // ── Vibración vía notificación (alternativa cuando navigator.vibrate() no funciona
-  // por la restricción de "actividad reciente del usuario" de Chrome)
-  let notificationPermissionRequested = false;
-
-  async function ensureNotificationPermission() {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) return false;
-    if (Notification.permission === 'granted') return true;
-    if (Notification.permission === 'denied') return false;
-    if (notificationPermissionRequested) return Notification.permission === 'granted';
-    notificationPermissionRequested = true;
-    try {
-      const result = await Notification.requestPermission();
-      return result === 'granted';
-    } catch (err) {
-      return false;
-    }
-  }
-
-  async function tryNotificationVibrate(pattern, title, body) {
-    if (!('serviceWorker' in navigator)) return;
-    const granted = await ensureNotificationPermission();
-    if (!granted) return;
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      reg.showNotification(title, {
-        body: body,
-        vibrate: pattern,
-        icon: 'icon-192.png',
-        tag: 'subtivoz-sound-alert',
-        silent: false
-      });
-    } catch (err) {
-      console.error('No se pudo mostrar la notificación con vibración:', err);
-    }
-  }
-
   function triggerLoudSoundAlert() {
     const now = Date.now();
     if (now - lastAnyTrigger < 1200) return; // ya vibró por una detección específica hace un instante
     lastAnyTrigger = now;
 
     tryVibrate(300);
-    tryNotificationVibrate([300], '⚡ Sonido fuerte', 'Se detectó un sonido fuerte o repentino');
     const flash = document.getElementById('loudFlash');
     flash.classList.remove('show');
     void flash.offsetWidth; // reinicia la animación si se repite rápido
@@ -3302,7 +3265,6 @@
     const btn = document.getElementById('soundBtn');
     const statusEl = document.getElementById('soundStatus');
     btn.disabled = true;
-    ensureNotificationPermission(); // pedido de permiso ligado al toque real del usuario en este botón
     try {
       statusEl.textContent = '⏳ Cargando modelo de IA (puede tardar unos segundos la primera vez)...';
       await ensureSoundModel();
@@ -3408,7 +3370,6 @@
       setTimeout(() => card.classList.remove('sound-active'), 2500);
     }
     tryVibrate([200, 100, 200]);
-    tryNotificationVibrate([200, 100, 200], info.icon + ' ' + info.label, 'SubtiVoz detectó este sonido');
 
     const history = document.getElementById('soundHistory');
     const line = document.createElement('div');
