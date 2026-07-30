@@ -1216,6 +1216,10 @@
       <div class="sound-card" id="cardHorn"><div class="sound-icon">🚗</div><div class="sound-name">Bocina / claxon</div></div>
       <div class="sound-card" id="cardDog"><div class="sound-icon">🐕</div><div class="sound-name">Perro ladrando</div></div>
       <div class="sound-card" id="cardAlarm"><div class="sound-icon">⚠️</div><div class="sound-name">Alarma / pitido genérico</div></div>
+      <div class="sound-card" id="cardPolice"><div class="sound-icon">🚓</div><div class="sound-name">Sirena de patrullero</div></div>
+      <div class="sound-card" id="cardAmbulance"><div class="sound-icon">🚑</div><div class="sound-name">Sirena de ambulancia</div></div>
+      <div class="sound-card" id="cardFire"><div class="sound-icon">🚒</div><div class="sound-name">Sirena de bomberos</div></div>
+      <div class="sound-card" id="cardSirenGeneric"><div class="sound-icon">🔊</div><div class="sound-name">Sirena genérica</div></div>
     </div>
     <div class="sound-disclaimer">⚠️ El micrófono no puede detectar gas en el aire — solo reconoce el <strong>sonido de una alarma</strong> si ya tenés un detector instalado.</div>
     <div class="sound-history" id="soundHistory"></div>
@@ -3124,7 +3128,11 @@
     Baby:     { indices: [20, 19],   icon: '👶', label: 'Llanto de bebé', vibrate: [80, 60, 80, 60, 80, 60, 80] },      // Baby cry/infant cry, Crying/sobbing: varios pulsos cortos
     Horn:     { indices: [302, 102, 303], icon: '🚗', label: 'Bocina / claxon', vibrate: [250, 100, 250] }, // Vehicle horn, Honk, Toot: dos pulsos medios
     Dog:      { indices: [69, 70, 73], icon: '🐕', label: 'Perro ladrando', vibrate: [60, 40, 60, 40, 60, 40, 60, 40, 60], threshold: 0.20 },    // Dog, Bark, Bow-wow: ráfaga rápida tipo ladrido — umbral más bajo porque un ladrido es corto y se diluye en el promedio de 1 segundo
-    Alarm:    { indices: [382, 475], icon: '⚠️', label: 'Alarma o pitido genérico (revisar qué es)', vibrate: [500, 150, 500] } // Alarm, Beep/bleep: dos pulsos largos y fuertes
+    Alarm:    { indices: [382, 475], icon: '⚠️', label: 'Alarma o pitido genérico (revisar qué es)', vibrate: [500, 150, 500] }, // Alarm, Beep/bleep: dos pulsos largos y fuertes
+    Police:   { indices: [317], icon: '🚓', label: 'Sirena de patrullero', vibrate: [150, 80, 150, 80, 150, 80, 150] }, // Police car (siren): pulsos cortos alternados, tipo sirena
+    Ambulance:{ indices: [318], icon: '🚑', label: 'Sirena de ambulancia', vibrate: [300, 100, 150, 100, 300] }, // Ambulance (siren): largo-corto-largo
+    Fire:     { indices: [319], icon: '🚒', label: 'Sirena de bomberos', vibrate: [500, 100, 500, 100, 150] }, // Fire engine/truck (siren): largo-largo-corto, urgente
+    SirenGeneric: { indices: [390, 391], icon: '🔊', label: 'Sirena genérica (no identificada)', vibrate: [600, 100, 200] } // Siren, Civil defense siren: no se sabe cuál de las 3 es
   };
   const SOUND_THRESHOLD = 0.35;
   const SOUND_COOLDOWN_MS = 4000;
