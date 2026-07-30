@@ -3123,7 +3123,7 @@
     Smoke:    { indices: [393, 394], icon: '🚨', label: 'Alarma de humo', vibrate: [400, 120, 400, 120, 400] },      // Smoke detector/alarm, Fire alarm: tres pulsos largos, urgente
     Baby:     { indices: [20, 19],   icon: '👶', label: 'Llanto de bebé', vibrate: [80, 60, 80, 60, 80, 60, 80] },      // Baby cry/infant cry, Crying/sobbing: varios pulsos cortos
     Horn:     { indices: [302, 102, 303], icon: '🚗', label: 'Bocina / claxon', vibrate: [250, 100, 250] }, // Vehicle horn, Honk, Toot: dos pulsos medios
-    Dog:      { indices: [69, 70, 73], icon: '🐕', label: 'Perro ladrando', vibrate: [60, 40, 60, 40, 60, 40, 60, 40, 60] },    // Dog, Bark, Bow-wow: ráfaga rápida tipo ladrido
+    Dog:      { indices: [69, 70, 73], icon: '🐕', label: 'Perro ladrando', vibrate: [60, 40, 60, 40, 60, 40, 60, 40, 60], threshold: 0.20 },    // Dog, Bark, Bow-wow: ráfaga rápida tipo ladrido — umbral más bajo porque un ladrido es corto y se diluye en el promedio de 1 segundo
     Alarm:    { indices: [382, 475], icon: '⚠️', label: 'Alarma o pitido genérico (revisar qué es)', vibrate: [500, 150, 500] } // Alarm, Beep/bleep: dos pulsos largos y fuertes
   };
   const SOUND_THRESHOLD = 0.35;
@@ -3384,7 +3384,7 @@
 
       for (const [cat, info] of Object.entries(SOUND_CLASSES)) {
         const score = Math.max(...info.indices.map(i => avg[i] || 0));
-        if (score >= SOUND_THRESHOLD) {
+        if (score >= (info.threshold ?? SOUND_THRESHOLD)) {
           const now = Date.now();
           if (!soundLastTrigger[cat] || now - soundLastTrigger[cat] > SOUND_COOLDOWN_MS) {
             soundLastTrigger[cat] = now;
