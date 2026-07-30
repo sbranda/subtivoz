@@ -3119,12 +3119,12 @@
   // ── Sound pattern detection (YAMNet via TensorFlow.js)
   // Índices verificados contra yamnet_class_map.csv (521 clases de AudioSet)
   const SOUND_CLASSES = {
-    Doorbell: { indices: [349, 350], icon: '🔔', label: 'Timbre de puerta' },   // Doorbell, Ding-dong
-    Smoke:    { indices: [393, 394], icon: '🚨', label: 'Alarma de humo' },      // Smoke detector/alarm, Fire alarm
-    Baby:     { indices: [20, 19],   icon: '👶', label: 'Llanto de bebé' },      // Baby cry/infant cry, Crying/sobbing
-    Horn:     { indices: [302, 102, 303], icon: '🚗', label: 'Bocina / claxon' }, // Vehicle horn, Honk, Toot
-    Dog:      { indices: [69, 70, 73], icon: '🐕', label: 'Perro ladrando' },    // Dog, Bark, Bow-wow
-    Alarm:    { indices: [382, 475], icon: '⚠️', label: 'Alarma o pitido genérico (revisar qué es)' } // Alarm, Beep/bleep
+    Doorbell: { indices: [349, 350], icon: '🔔', label: 'Timbre de puerta', vibrate: [100, 80, 100] },   // Doorbell, Ding-dong: dos toques cortos
+    Smoke:    { indices: [393, 394], icon: '🚨', label: 'Alarma de humo', vibrate: [400, 120, 400, 120, 400] },      // Smoke detector/alarm, Fire alarm: tres pulsos largos, urgente
+    Baby:     { indices: [20, 19],   icon: '👶', label: 'Llanto de bebé', vibrate: [80, 60, 80, 60, 80, 60, 80] },      // Baby cry/infant cry, Crying/sobbing: varios pulsos cortos
+    Horn:     { indices: [302, 102, 303], icon: '🚗', label: 'Bocina / claxon', vibrate: [250, 100, 250] }, // Vehicle horn, Honk, Toot: dos pulsos medios
+    Dog:      { indices: [69, 70, 73], icon: '🐕', label: 'Perro ladrando', vibrate: [60, 40, 60, 40, 60, 40, 60, 40, 60] },    // Dog, Bark, Bow-wow: ráfaga rápida tipo ladrido
+    Alarm:    { indices: [382, 475], icon: '⚠️', label: 'Alarma o pitido genérico (revisar qué es)', vibrate: [500, 150, 500] } // Alarm, Beep/bleep: dos pulsos largos y fuertes
   };
   const SOUND_THRESHOLD = 0.35;
   const SOUND_COOLDOWN_MS = 4000;
@@ -3407,8 +3407,9 @@
       card.classList.add('sound-active');
       setTimeout(() => card.classList.remove('sound-active'), 2500);
     }
-    tryVibrate([200, 100, 200]);
-    tryNotificationVibrate([200, 100, 200], info.icon + ' ' + info.label, 'SubtiVoz detectó este sonido');
+    const pattern = info.vibrate || [200, 100, 200];
+    tryVibrate(pattern);
+    tryNotificationVibrate(pattern, info.icon + ' ' + info.label, 'SubtiVoz detectó este sonido');
 
     const history = document.getElementById('soundHistory');
     const line = document.createElement('div');
