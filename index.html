@@ -380,6 +380,14 @@
   }
   .placeholder-icon { font-size: 44px; opacity: 0.35; }
 
+  .ambient-badge {
+    margin-top: 18px; display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: 100px;
+    background: var(--card); border: 1px solid var(--border);
+    font-size: 13px; font-weight: 700; color: var(--text);
+  }
+  .ambient-db { color: var(--muted); font-family: 'Space Mono', monospace; font-weight: 400; font-size: 11px; }
+
   .waveform {
     display: flex; align-items: center; justify-content: center;
     gap: 3px; height: 28px; margin-bottom: 8px;
@@ -992,6 +1000,9 @@
       <div class="placeholder-text" id="placeholder">
         <div class="placeholder-icon">🎙️</div>
         <div><strong>Toca el micrófono</strong><br>para generar subtítulos automáticos</div>
+        <div class="ambient-badge" id="ambientBadge" style="display:none;">
+          <span id="ambientDot">⚪</span> <span id="ambientLabel">Midiendo...</span> <span id="ambientDb" class="ambient-db"></span>
+        </div>
       </div>
 
       <div class="waveform" id="waveform">
@@ -1050,6 +1061,15 @@
   </button>
 
   <div class="advanced-options" id="advancedOptions">
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">📊 Nivel de ruido ambiente
+        <span class="meter-toggle-hint">Muestra qué tan ruidoso está el lugar ANTES de iniciar, para saber si el reconocimiento va a andar bien</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="ambientToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
     <div class="meter-toggle-row">
       <span class="meter-toggle-label">🔊 Medidor de volumen
         <span class="meter-toggle-hint">(puede afectar la detección de voz en algunos teléfonos)</span>
@@ -2186,11 +2206,79 @@
     document.getElementById('dbValue').textContent = '-- dB';
   }
 
+  // ── Nivel de ruido ambiente (independiente, solo mientras NO se está escuchando)
+  let ambientEnabled = false;
+  let ambientStream = null;
+  let ambientAudioCtx = null;
+  let ambientAnalyser = null;
+  let ambientRAF = null;
+
+  document.getElementById('ambientToggle').addEventListener('change', (e) => {
+    ambientEnabled = e.target.checked;
+    if (ambientEnabled && !isListening) startAmbientMeter();
+    else stopAmbientMeter();
+  });
+
+  async function startAmbientMeter() {
+    if (ambientStream) return; // ya corriendo
+    document.getElementById('ambientBadge').style.display = 'inline-flex';
+    try {
+      ambientStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      ambientAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = ambientAudioCtx.createMediaStreamSource(ambientStream);
+      ambientAnalyser = ambientAudioCtx.createAnalyser();
+      ambientAnalyser.fftSize = 1024;
+      ambientAnalyser.smoothingTimeConstant = 0.8;
+      source.connect(ambientAnalyser);
+      ambientMeterLoop();
+    } catch (err) {
+      document.getElementById('ambientLabel').textContent = 'Sin acceso al micrófono';
+      document.getElementById('ambientDot').textContent = '⚪';
+    }
+  }
+
+  function ambientMeterLoop() {
+    if (!ambientAnalyser) return;
+    const data = new Uint8Array(ambientAnalyser.fftSize);
+    ambientAnalyser.getByteTimeDomainData(data);
+    let sumSquares = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = (data[i] - 128) / 128;
+      sumSquares += v * v;
+    }
+    const rms = Math.sqrt(sumSquares / data.length);
+    const db = rms > 0 ? 20 * Math.log10(rms) : DB_FLOOR;
+    const dbClamped = Math.max(DB_FLOOR, Math.min(0, db));
+
+    let dot, label;
+    if (dbClamped <= -40) { dot = '🟢'; label = 'Silencioso — debería andar muy bien'; }
+    else if (dbClamped <= -20) { dot = '🟡'; label = 'Moderado — debería andar bien'; }
+    else { dot = '🔴'; label = 'Ruidoso — puede costarle al reconocimiento'; }
+
+    document.getElementById('ambientDot').textContent = dot;
+    document.getElementById('ambientLabel').textContent = label;
+    document.getElementById('ambientDb').textContent = Math.round(dbClamped) + ' dB';
+
+    ambientRAF = requestAnimationFrame(ambientMeterLoop);
+  }
+
+  function stopAmbientMeter() {
+    if (ambientRAF) cancelAnimationFrame(ambientRAF);
+    ambientRAF = null;
+    if (ambientStream) ambientStream.getTracks().forEach(t => t.stop());
+    ambientStream = null;
+    if (ambientAudioCtx) ambientAudioCtx.close().catch(() => {});
+    ambientAudioCtx = null;
+    ambientAnalyser = null;
+    document.getElementById('ambientBadge').style.display = 'none';
+  }
+
   function toggleRecognition() {
     isListening ? stopRecognition() : startRecognition();
   }
 
   function startRecognition() {
+    stopAmbientMeter();
     if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
     if (!setupRecognition()) return;
     isListening = true;
@@ -2213,6 +2301,7 @@
     if (recognition) { try { recognition.stop(); } catch(e){} }
     stopVolumeMeter();
     stopCaptionTagDetection();
+    if (ambientEnabled) startAmbientMeter();
     clearInterval(timerInterval);
     setStatus('idle');
     document.getElementById('waveform').classList.remove('active');
