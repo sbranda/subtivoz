@@ -2136,6 +2136,7 @@
     lastFinalChunk = '';
     lastFinalChunkTime = 0;
     try { recognition.start(); } catch(e) { showToast('Error al iniciar micrófono'); isListening = false; return; }
+    checkBatteryWarning();
     if (isMeterEnabled) startVolumeMeter();
     if (isCaptionTagsEnabled) startCaptionTagDetection();
     if (!currentSessionId) currentSessionId = Date.now();
@@ -3457,6 +3458,7 @@
       silentGain.connect(soundAudioCtx.destination);
 
       isSoundDetecting = true;
+      checkBatteryWarning();
       btn.disabled = false;
       btn.className = 'main-btn btn-stop';
       btn.textContent = '⏹️ Detener Detección';
@@ -3551,6 +3553,37 @@
       switchMode(tab);
     }
   })();
+
+  // ── Aviso de batería baja durante uso activo (Subtítulos o Sonidos)
+  // No disponible en todos los navegadores (Firefox no lo tiene) — se ignora sin romper nada si falta.
+  const LOW_BATTERY_THRESHOLD = 0.15;
+  let batteryManager = null;
+  let batteryWarningShown = false;
+
+  function checkBatteryWarning() {
+    if (!batteryManager) return;
+    const isActive = isListening || isSoundDetecting;
+    if (isActive && !batteryManager.charging && batteryManager.level <= LOW_BATTERY_THRESHOLD) {
+      if (!batteryWarningShown) {
+        batteryWarningShown = true;
+        showToast('🔋 Batería baja (' + Math.round(batteryManager.level * 100) + '%) — conectá el cargador si podés');
+      }
+    } else if (batteryManager.charging || batteryManager.level > LOW_BATTERY_THRESHOLD) {
+      batteryWarningShown = false; // permite que vuelva a avisar si baja de nuevo más adelante
+    }
+  }
+
+  async function initBatteryMonitor() {
+    if (!('getBattery' in navigator)) return;
+    try {
+      batteryManager = await navigator.getBattery();
+      batteryManager.addEventListener('levelchange', checkBatteryWarning);
+      batteryManager.addEventListener('chargingchange', checkBatteryWarning);
+    } catch (err) {
+      // Bloqueado por política del navegador o no soportado: seguimos sin esta función, sin romper nada
+    }
+  }
+  initBatteryMonitor();
 </script>
 </body>
 </html>
