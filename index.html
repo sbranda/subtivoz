@@ -1283,6 +1283,16 @@
         <span class="switch-track"></span>
       </label>
     </div>
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">🔑 Palabras clave de alerta
+        <span class="meter-toggle-hint">Escucha si alguien dice tu nombre u otras palabras que elijas (usa el micrófono para voz, aparte de los sonidos)</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="keywordAlertToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <button class="btn-secondary" style="width:100%;" onclick="openKeywordModal()">🔑 Gestionar palabras clave</button>
     <button class="main-btn btn-start" id="soundBtn" onclick="toggleSoundDetection()">🔔 Iniciar Detección</button>
   </div>
 </div>
@@ -1432,6 +1442,21 @@
     </div>
     <div class="phrase-group-label" style="margin-top:6px;">Tus frases agregadas</div>
     <div class="dictionary-list" id="customPhrasesManageList"></div>
+  </div>
+</div>
+
+<div id="keywordModal" style="display:none;">
+  <div class="modal-card">
+    <h3>🔑 Palabras clave de alerta</h3>
+    <p class="modal-hint">Agregá tu nombre u otras palabras (por ejemplo "cuidado", "es tu turno"). Mientras la detección de Sonidos esté activa y el interruptor prendido, la app va a vibrar y avisar si alguien las dice.</p>
+    <label class="modal-label">Palabra o frase corta</label>
+    <input type="text" id="newKeywordInput" placeholder="Ej: Camilo, cuidado, es tu turno">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeKeywordModal()">Cerrar</button>
+      <button class="main-btn btn-start" onclick="addKeyword()">➕ Agregar</button>
+    </div>
+    <div class="phrase-group-label" style="margin-top:6px;">Tus palabras guardadas</div>
+    <div class="dictionary-list" id="keywordManageList"></div>
   </div>
 </div>
 
@@ -3449,6 +3474,147 @@
     return out;
   }
 
+  // ── Palabras clave de alerta (reconocimiento de voz en paralelo a la detección de sonidos)
+  const KEYWORDS_KEY = 'subtivoz_keywords';
+  let keywordAlertEnabled = false;
+  let keywordRecognition = null;
+  let lastKeywordTrigger = 0;
+
+  document.getElementById('keywordAlertToggle').addEventListener('change', (e) => {
+    keywordAlertEnabled = e.target.checked;
+    if (isSoundDetecting) {
+      if (keywordAlertEnabled) startKeywordRecognition();
+      else stopKeywordRecognition();
+    }
+  });
+
+  function getKeywords() {
+    try { return JSON.parse(localStorage.getItem(KEYWORDS_KEY) || '[]'); }
+    catch (err) { return []; }
+  }
+
+  function saveKeywords(list) {
+    try { localStorage.setItem(KEYWORDS_KEY, JSON.stringify(list)); }
+    catch (err) { console.error('No se pudieron guardar las palabras clave:', err); }
+  }
+
+  function openKeywordModal() {
+    renderKeywordManageList();
+    document.getElementById('keywordModal').style.display = 'flex';
+  }
+
+  function closeKeywordModal() {
+    document.getElementById('keywordModal').style.display = 'none';
+  }
+
+  function addKeyword() {
+    const input = document.getElementById('newKeywordInput');
+    const word = input.value.trim();
+    if (!word) { showToast('⚠️ Escribí una palabra o frase'); return; }
+    const list = getKeywords();
+    list.push({ id: Date.now(), word });
+    saveKeywords(list);
+    renderKeywordManageList();
+    input.value = '';
+    showToast('✅ Palabra clave agregada');
+  }
+
+  function deleteKeyword(id) {
+    saveKeywords(getKeywords().filter(k => k.id !== id));
+    renderKeywordManageList();
+  }
+
+  function renderKeywordManageList() {
+    const list = getKeywords();
+    const container = document.getElementById('keywordManageList');
+    if (!list.length) {
+      container.innerHTML = '<div class="dictionary-empty">Todavía no agregaste ninguna palabra.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    list.forEach(k => {
+      const row = document.createElement('div');
+      row.className = 'dictionary-entry';
+      row.innerHTML = `<span class="dictionary-entry-text">${escapeHtml(k.word)}</span><button aria-label="Borrar">🗑️</button>`;
+      row.querySelector('button').onclick = () => deleteKeyword(k.id);
+      container.appendChild(row);
+    });
+  }
+
+  function startKeywordRecognition() {
+    if (!SpeechRecognition) return;
+    if (!getKeywords().length) return;
+    try {
+      keywordRecognition = new SpeechRecognition();
+      keywordRecognition.continuous = true;
+      keywordRecognition.interimResults = true;
+      keywordRecognition.lang = document.getElementById('langSelect').value;
+
+      keywordRecognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const text = normalizeForSearch(event.results[i][0].transcript);
+          const keywords = getKeywords();
+          for (const k of keywords) {
+            if (text.includes(normalizeForSearch(k.word))) {
+              triggerKeywordAlert(k.word);
+              break;
+            }
+          }
+        }
+      };
+
+      keywordRecognition.onerror = (e) => {
+        // Es común que compita con el micrófono de la detección de sonidos — degradamos en silencio,
+        // salvo que sea un permiso denegado, que sí vale la pena avisar.
+        if (e.error === 'not-allowed') {
+          showToast('⛔ No se pudo activar la escucha de palabras clave (permiso de micrófono)');
+          keywordAlertEnabled = false;
+          document.getElementById('keywordAlertToggle').checked = false;
+        }
+      };
+
+      keywordRecognition.onend = () => {
+        if (keywordAlertEnabled && isSoundDetecting) {
+          try { keywordRecognition.start(); } catch (e) {}
+        }
+      };
+
+      keywordRecognition.start();
+    } catch (err) {
+      console.error('No se pudo iniciar la escucha de palabras clave:', err);
+    }
+  }
+
+  function stopKeywordRecognition() {
+    if (keywordRecognition) {
+      const r = keywordRecognition;
+      keywordRecognition = null; // primero, para que el onend no lo reinicie
+      try { r.stop(); } catch (e) {}
+    }
+  }
+
+  function triggerKeywordAlert(word) {
+    const now = Date.now();
+    if (now - lastKeywordTrigger < 3000) return; // evita repetir la misma alerta varias veces seguidas
+    lastKeywordTrigger = now;
+
+    tryVibrate([120, 60, 120, 60, 120, 60, 120, 60, 120]);
+    tryNotificationVibrate([120, 60, 120, 60, 120, 60, 120, 60, 120], '🔑 Palabra clave detectada', `Alguien dijo: "${word}"`);
+
+    const flash = document.getElementById('loudFlash');
+    flash.classList.remove('show');
+    void flash.offsetWidth;
+    flash.classList.add('show');
+
+    const history = document.getElementById('soundHistory');
+    const line = document.createElement('div');
+    line.className = 'sound-history-line';
+    const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    line.innerHTML = `<span class="sound-history-icon">🔑</span> Dijeron "${escapeHtml(word)}" <span class="sound-history-time">${time}</span>`;
+    history.prepend(line);
+    while (history.children.length > 20) history.removeChild(history.lastChild);
+  }
+
   async function toggleSoundDetection() {
     if (isSoundDetecting) stopSoundDetection();
     else await startSoundDetection();
@@ -3497,6 +3663,7 @@
 
       isSoundDetecting = true;
       checkBatteryWarning();
+      if (keywordAlertEnabled) startKeywordRecognition();
       btn.disabled = false;
       btn.className = 'main-btn btn-stop';
       btn.textContent = '⏹️ Detener Detección';
@@ -3514,6 +3681,7 @@
 
   function stopSoundDetection() {
     isSoundDetecting = false;
+    stopKeywordRecognition();
     if (soundProcessor) { soundProcessor.onaudioprocess = null; soundProcessor.disconnect(); }
     if (soundSource) soundSource.disconnect();
     if (soundStream) soundStream.getTracks().forEach(t => t.stop());
