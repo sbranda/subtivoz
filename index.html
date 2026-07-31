@@ -1394,25 +1394,30 @@
   </div>
 
   <div class="controls">
-    <div class="meter-toggle-row">
-      <span class="meter-toggle-label">📳 Vibrar con sonidos fuertes/repentinos
-        <span class="meter-toggle-hint">Aplausos, portazos, gritos — vibra al instante, sin esperar a identificar el sonido</span>
-      </span>
-      <label class="switch">
-        <input type="checkbox" id="loudSoundToggle" checked>
-        <span class="switch-track"></span>
-      </label>
+    <button class="advanced-toggle-btn" onclick="toggleSoundAdvancedOptions()">
+      ⚙️ Más opciones <span id="soundAdvancedChevron">▾</span>
+    </button>
+    <div class="advanced-options" id="soundAdvancedOptions">
+      <div class="meter-toggle-row">
+        <span class="meter-toggle-label">📳 Vibrar con sonidos fuertes/repentinos
+          <span class="meter-toggle-hint">Aplausos, portazos, gritos — vibra al instante, sin esperar a identificar el sonido</span>
+        </span>
+        <label class="switch">
+          <input type="checkbox" id="loudSoundToggle" checked>
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="meter-toggle-row">
+        <span class="meter-toggle-label">🔑 Palabras clave de alerta
+          <span class="meter-toggle-hint">Escucha si alguien dice tu nombre u otras palabras que elijas (usa el micrófono para voz, aparte de los sonidos)</span>
+        </span>
+        <label class="switch">
+          <input type="checkbox" id="keywordAlertToggle">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <button class="btn-secondary" style="width:100%;" onclick="openKeywordModal()">🔑 Gestionar palabras clave</button>
     </div>
-    <div class="meter-toggle-row">
-      <span class="meter-toggle-label">🔑 Palabras clave de alerta
-        <span class="meter-toggle-hint">Escucha si alguien dice tu nombre u otras palabras que elijas (usa el micrófono para voz, aparte de los sonidos)</span>
-      </span>
-      <label class="switch">
-        <input type="checkbox" id="keywordAlertToggle">
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <button class="btn-secondary" style="width:100%;" onclick="openKeywordModal()">🔑 Gestionar palabras clave</button>
     <button class="main-btn btn-start" id="soundBtn" onclick="toggleSoundDetection()">🔔 Iniciar Detección</button>
   </div>
 </div>
@@ -3164,7 +3169,14 @@
   let hc = false;
   function toggleAdvancedOptions() {
     const panel = document.getElementById('advancedOptions');
-    const btn = document.querySelector('.advanced-toggle-btn');
+    const btn = document.querySelector('#listenView .advanced-toggle-btn');
+    const isOpen = panel.classList.toggle('show');
+    btn.classList.toggle('open', isOpen);
+  }
+
+  function toggleSoundAdvancedOptions() {
+    const panel = document.getElementById('soundAdvancedOptions');
+    const btn = document.querySelector('#soundView .advanced-toggle-btn');
     const isOpen = panel.classList.toggle('show');
     btn.classList.toggle('open', isOpen);
   }
