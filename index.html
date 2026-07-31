@@ -1130,6 +1130,21 @@
       </label>
     </div>
 
+    <div class="meter-toggle-row">
+      <span class="meter-toggle-label">📖 Modo lectura pausada
+        <span class="meter-toggle-hint">Muestra las frases de a una, con un respiro entre cada una, para tener más tiempo de leer</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" id="pausedReadingToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="translate-target-row" id="pausedReadingDelayRow">
+      <span class="font-label">Pausa entre frases</span>
+      <input type="range" class="font-slider" id="pausedReadingDelaySlider" min="1" max="8" value="3" style="flex:1;">
+      <span class="font-value" id="pausedReadingDelayValue">3s</span>
+    </div>
+
     <div class="translate-target-row" id="translateTargetRow">
       <span class="font-label">Traducir a</span>
       <select class="lang-select" id="translateTarget">
@@ -1670,6 +1685,17 @@
   const TURN_PAUSE_MS = 1200; // gap that counts as a possible speaker change
   let speakerNames = { 1: null, 2: null, 3: null, 4: null }; // nombres reales, opcionales, por número de hablante
 
+  // ── Modo lectura pausada (revela las frases de a una, con un respiro entre cada una)
+  let pausedReadingEnabled = false;
+  let pausedReadingDelayMs = 3000;
+  let historyQueue = [];
+  let historyQueueTimer = null;
+
+  function clearHistoryQueue() {
+    historyQueue = [];
+    if (historyQueueTimer) { clearTimeout(historyQueueTimer); historyQueueTimer = null; }
+  }
+
   function speakerDisplayName(num) {
     return speakerNames[num] || ('Persona ' + num);
   }
@@ -1750,6 +1776,24 @@
   speakerToggle.addEventListener('change', () => {
     speakerIdEnabled = speakerToggle.checked;
     document.getElementById('liveSpeakerTag').style.display = speakerIdEnabled && isListening ? 'inline-block' : 'none';
+  });
+
+  const pausedReadingToggle = document.getElementById('pausedReadingToggle');
+  const pausedReadingDelayRow = document.getElementById('pausedReadingDelayRow');
+  const pausedReadingDelaySlider = document.getElementById('pausedReadingDelaySlider');
+  pausedReadingToggle.addEventListener('change', () => {
+    pausedReadingEnabled = pausedReadingToggle.checked;
+    pausedReadingDelayRow.classList.toggle('show', pausedReadingEnabled);
+    if (!pausedReadingEnabled) {
+      // Si se apaga, mostramos de una todo lo que estaba esperando en la cola
+      const queued = historyQueue.slice();
+      clearHistoryQueue();
+      queued.forEach(item => addToHistoryImmediate(item.text, item.speakerNum));
+    }
+  });
+  pausedReadingDelaySlider.addEventListener('input', (e) => {
+    pausedReadingDelayMs = parseInt(e.target.value, 10) * 1000;
+    document.getElementById('pausedReadingDelayValue').textContent = e.target.value + 's';
   });
 
   function updateLiveSpeakerTag() {
@@ -2408,6 +2452,27 @@
 
   function addToHistory(text, speakerNum) {
     if (!text.trim()) return;
+    if (!pausedReadingEnabled) {
+      addToHistoryImmediate(text, speakerNum);
+      return;
+    }
+    historyQueue.push({ text, speakerNum });
+    processHistoryQueue();
+  }
+
+  function processHistoryQueue() {
+    if (historyQueueTimer) return; // ya hay un ciclo de espera corriendo
+    if (!historyQueue.length) return;
+    const next = historyQueue.shift();
+    addToHistoryImmediate(next.text, next.speakerNum);
+    historyQueueTimer = setTimeout(() => {
+      historyQueueTimer = null;
+      processHistoryQueue();
+    }, pausedReadingDelayMs);
+  }
+
+  function addToHistoryImmediate(text, speakerNum) {
+    if (!text.trim()) return;
     const history = document.getElementById('subtitleHistory');
     const line = document.createElement('div');
     line.className = 'history-line';
@@ -2814,6 +2879,7 @@
     currentSpeakerNum = 1;
     lastFinalEndTime = null;
     speakerNames = { 1: null, 2: null, 3: null, 4: null };
+    clearHistoryQueue();
     updateLiveSpeakerTag();
     // Si había una sesión en curso guardada, la borramos y empieza una nueva
     if (currentSessionId) {
