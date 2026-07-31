@@ -781,6 +781,16 @@
   .history-view-header h2 { font-size: 17px; font-weight: 800; }
   .history-view-header-btns { display: flex; align-items: center; gap: 8px; }
   .history-view-header-btns .btn-secondary { padding: 8px 12px; font-size: 11px; }
+
+  .history-search-row { padding: 12px 20px 0; flex-shrink: 0; }
+  #historySearchInput {
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 100px;
+    padding: 11px 16px; color: var(--text); font-family: var(--font-main); font-size: 14px;
+    outline: none;
+  }
+  #historySearchInput:focus { border-color: var(--accent); }
+  .history-search-match { background: rgba(0,229,255,0.3); color: var(--accent); border-radius: 3px; padding: 0 1px; }
+
   #closeHistoryBtn {
     width: 44px; height: 44px; border-radius: 50%;
     background: var(--card); border: 1px solid var(--border); color: var(--text);
@@ -1350,6 +1360,9 @@
       <button class="btn-secondary" onclick="deleteAllSessions()">🗑️ Borrar todo</button>
       <button id="closeHistoryBtn" onclick="closeHistoryView()" aria-label="Cerrar historial">✕</button>
     </div>
+  </div>
+  <div class="history-search-row">
+    <input type="text" id="historySearchInput" placeholder="🔍 Buscar en todo el historial..." oninput="renderHistoryList()">
   </div>
   <div class="history-list" id="historyList"></div>
 </div>
@@ -2455,19 +2468,57 @@
     document.getElementById('historyView').style.display = 'none';
   }
 
+  function normalizeForSearch(str) {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  function getSnippetAroundMatch(text, query, radius) {
+    radius = radius || 100;
+    const idx = normalizeForSearch(text).indexOf(normalizeForSearch(query));
+    if (idx === -1) return text.length > 220 ? text.slice(0, 220) + '…' : text;
+    const start = Math.max(0, idx - radius);
+    const end = Math.min(text.length, idx + query.length + radius);
+    let snippet = text.slice(start, end);
+    if (start > 0) snippet = '…' + snippet;
+    if (end < text.length) snippet = snippet + '…';
+    return snippet;
+  }
+
+  function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    const idx = normalizeForSearch(text).indexOf(normalizeForSearch(query));
+    if (idx === -1) return escapeHtml(text);
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + query.length);
+    const after = text.slice(idx + query.length);
+    return escapeHtml(before) + '<span class="history-search-match">' + escapeHtml(match) + '</span>' + escapeHtml(after);
+  }
+
   function renderHistoryList() {
-    const sessions = getSessions();
+    const searchInput = document.getElementById('historySearchInput');
+    const query = searchInput ? searchInput.value.trim() : '';
+    const allSessions = getSessions();
+    const sessions = query
+      ? allSessions.filter(s => normalizeForSearch(s.text).includes(normalizeForSearch(query)))
+      : allSessions;
+
     const list = document.getElementById('historyList');
     list.innerHTML = '';
-    if (!sessions.length) {
+
+    if (!allSessions.length) {
       list.innerHTML = '<div class="history-empty">🕘 Todavía no hay sesiones guardadas.<br>Se van a guardar solas la próxima vez que uses los subtítulos.</div>';
+      return;
+    }
+    if (!sessions.length) {
+      list.innerHTML = `<div class="history-empty">🔍 No se encontró "${escapeHtml(query)}" en ninguna sesión guardada.</div>`;
       return;
     }
     sessions.forEach(s => {
       const date = new Date(s.timestamp);
       const dateStr = date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const timeStr = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      const preview = s.text.length > 220 ? s.text.slice(0, 220) + '…' : s.text;
+      const preview = query ? getSnippetAroundMatch(s.text, query) : (s.text.length > 220 ? s.text.slice(0, 220) + '…' : s.text);
+      const previewHtml = query ? highlightMatch(preview, query) : escapeHtml(preview);
 
       const card = document.createElement('div');
       card.className = 'history-session-card';
@@ -2477,7 +2528,7 @@
           <span>${typeIcon} ${dateStr} · ${timeStr}</span>
           <span>${s.wordCount || s.text.trim().split(/\s+/).length} palabras</span>
         </div>
-        <div class="history-session-preview">${escapeHtml(preview)}</div>
+        <div class="history-session-preview">${previewHtml}</div>
         <div class="history-session-actions">
           <button data-action="copy">📋 Copiar</button>
           <button data-action="delete">🗑️ Borrar</button>
