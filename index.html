@@ -735,6 +735,26 @@
   body.hc #fullscreenView { background: #000; }
   body.hc #fullscreenText { font-size: clamp(40px, 12vw, 120px); }
 
+  /* ── MODO PRESENTACIÓN (proyector / pantalla grande) ── */
+  #presentationView {
+    position: fixed; inset: 0; z-index: 910;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px;
+  }
+  #presentationText {
+    font-family: var(--font-main); font-weight: 800;
+    font-size: clamp(48px, 15vw, 180px); line-height: 1.2;
+    color: #fff; text-align: center;
+    max-width: 100%;
+  }
+  #exitPresentationBtn {
+    position: absolute; top: calc(16px + var(--safe-top)); right: 16px;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff;
+    font-size: 20px; cursor: pointer; touch-action: manipulation;
+  }
+
   /* ── EMERGENCY CONTACT MODAL (y otros modales con el mismo patrón) ── */
   #emergencyConfigModal, #addPhraseModal, #keywordModal, #speakerTagModal {
     position: fixed; inset: 0; z-index: 950;
@@ -1157,6 +1177,8 @@
       </select>
     </div>
 
+    <button class="btn-secondary" style="width:100%;" onclick="enterPresentationMode()">🖥️ Modo presentación (proyector / pantalla grande)</button>
+
     <button class="btn-secondary" style="width:100%;" onclick="openHistoryView()">🕘 Historial de sesiones</button>
 
     <button class="btn-secondary" style="width:100%;" onclick="downloadSubtitles()">⬇️ Descargar subtítulos (.txt)</button>
@@ -1457,6 +1479,11 @@
     <span id="fsFinalText"></span><span class="interim-text" id="fsInterimText"></span>
   </div>
   <div id="fullscreenHint">Toca ✕ para salir</div>
+</div>
+
+<div id="presentationView" style="display:none;">
+  <button id="exitPresentationBtn" onclick="exitPresentationMode()" aria-label="Salir del modo presentación">✕</button>
+  <div id="presentationText"></div>
 </div>
 
 <div id="emergencyConfigModal" style="display:none;">
@@ -2247,6 +2274,9 @@
         document.getElementById('fsInterimText').textContent = interim;
         document.getElementById('fullscreenText').scrollTop = document.getElementById('fullscreenText').scrollHeight;
       }
+      if (isPresentationMode) {
+        document.getElementById('presentationText').textContent = (finalTranscript + interim).trim();
+      }
       if (isCameraMode) {
         document.getElementById('ccFinalText').textContent = finalTranscript;
         document.getElementById('ccInterimText').textContent = interim;
@@ -2999,6 +3029,32 @@
 
   // ── Modo pantalla completa (para clases / videollamadas)
   let isFullscreenMode = false;
+  let isPresentationMode = false;
+
+  async function enterPresentationMode() {
+    const view = document.getElementById('presentationView');
+    view.style.display = 'flex';
+    isPresentationMode = true;
+    document.getElementById('presentationText').textContent = (finalTranscript + document.getElementById('interimText').textContent).trim();
+    try {
+      if (view.requestFullscreen) await view.requestFullscreen();
+      else if (view.webkitRequestFullscreen) await view.webkitRequestFullscreen();
+    } catch (err) {}
+    if (!isListening) startRecognition();
+  }
+
+  async function exitPresentationMode() {
+    isPresentationMode = false;
+    document.getElementById('presentationView').style.display = 'none';
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitFullscreenElement && document.webkitExitFullscreen) await document.webkitExitFullscreen();
+    } catch (err) {}
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && isPresentationMode) exitPresentationMode();
+  });
 
   async function enterFullscreenMode() {
     const view = document.getElementById('fullscreenView');
