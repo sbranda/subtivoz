@@ -24,5 +24,35 @@
     }
   ],
   "categories": ["accessibility", "utilities"],
-  "screenshots": []
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Subtítulos",
+      "short_name": "Subtítulos",
+      "description": "Abrir subtítulos en tiempo real",
+      "url": "./index.html?tab=listen",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Chat",
+      "short_name": "Chat",
+      "description": "Abrir conversación con burbujas",
+      "url": "./index.html?tab=chat",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Hablar",
+      "short_name": "Hablar",
+      "description": "Abrir texto a voz y frases rápidas",
+      "url": "./index.html?tab=speak",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Sonidos",
+      "short_name": "Sonidos",
+      "description": "Abrir detección de sonidos",
+      "url": "./index.html?tab=sound",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

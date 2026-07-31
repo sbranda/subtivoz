@@ -3432,6 +3432,16 @@
   if ('wakeLock' in navigator) {
     navigator.wakeLock.request('screen').catch(() => {});
   }
+
+  // ── Accesos directos (mantener presionado el ícono de la app)
+  // Si se abrió desde uno de los accesos rápidos del manifest.json, saltar directo a esa pestaña
+  (function openFromShortcut() {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (['listen', 'chat', 'speak', 'sound'].includes(tab)) {
+      switchMode(tab);
+    }
+  })();
 </script>
 </body>
 </html>
