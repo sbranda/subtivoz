@@ -873,6 +873,34 @@
     font-size: 17px; cursor: pointer; touch-action: manipulation; flex-shrink: 0;
   }
 
+  /* ── TUTORIAL DE BIENVENIDA ── */
+  #tutorialView {
+    display: none; position: fixed; inset: 0; z-index: 990;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .tutorial-card {
+    position: relative;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    padding: 32px 24px 24px; width: 100%; max-width: 340px;
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px;
+  }
+  #tutorialSkip {
+    position: absolute; top: 14px; right: 14px;
+    background: none; border: none; color: var(--muted); font-size: 12px;
+    font-family: var(--font-main); font-weight: 700; cursor: pointer; touch-action: manipulation;
+    padding: 8px;
+  }
+  .tutorial-icon { font-size: 56px; margin-bottom: 4px; }
+  .tutorial-title { font-size: 19px; font-weight: 800; }
+  .tutorial-text { font-size: 14px; color: var(--muted); line-height: 1.5; margin-bottom: 6px; }
+  .tutorial-dots { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tutorial-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.2s ease; }
+  .tutorial-dot.active { background: var(--accent); }
+  .tutorial-nav { display: flex; gap: 10px; width: 100%; }
+  .tutorial-nav .btn-secondary { flex: 1; }
+  .tutorial-nav .main-btn { flex: 2; padding: 12px; font-size: 14px; }
+
   #closeHistoryBtn {
     width: 44px; height: 44px; border-radius: 50%;
     background: var(--card); border: 1px solid var(--border); color: var(--text);
@@ -1234,6 +1262,8 @@
     <button id="closeSettingsBtn" onclick="closeSettingsView()" aria-label="Cerrar ajustes">✕</button>
   </div>
   <div class="settings-content">
+    <button class="btn-secondary" style="width:100%;" onclick="openTutorial()">🎓 Ver el tutorial de bienvenida</button>
+
     <button class="btn-secondary" style="width:100%;" onclick="openHistoryView()">🕘 Historial de sesiones</button>
 
     <button class="btn-secondary" style="width:100%;" onclick="openStatsView()">📈 Ver estadísticas de uso</button>
@@ -1624,6 +1654,20 @@
     <div id="statsContent"></div>
     <div class="modal-actions">
       <button class="main-btn btn-start" onclick="closeStatsView()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="tutorialView" style="display:none;">
+  <div class="tutorial-card">
+    <button id="tutorialSkip" onclick="skipTutorial()">Saltar</button>
+    <div class="tutorial-icon" id="tutorialIcon">👋</div>
+    <div class="tutorial-title" id="tutorialTitle"></div>
+    <div class="tutorial-text" id="tutorialText"></div>
+    <div class="tutorial-dots" id="tutorialDots"></div>
+    <div class="tutorial-nav">
+      <button class="btn-secondary" id="tutorialBackBtn" onclick="tutorialBack()">← Atrás</button>
+      <button class="main-btn btn-start" id="tutorialNextBtn" onclick="tutorialNext()">Siguiente</button>
     </div>
   </div>
 </div>
@@ -2955,6 +2999,66 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // ── Tutorial de bienvenida (primera vez, o cuando se quiera repasar desde Ajustes)
+  const TUTORIAL_SEEN_KEY = 'subtivoz_tutorial_seen';
+  const TUTORIAL_SLIDES = [
+    { icon: '👋', title: '¡Bienvenido a SubtiVoz!', text: 'Una app pensada para ayudar a comunicarse — para sordos, hipoacúsicos, o cualquiera que la necesite. Gratis, en tu teléfono, sin tienda de aplicaciones.' },
+    { icon: '🎙️', title: 'Subtítulos', text: 'Transcribe en vivo lo que se dice a tu alrededor. En "Más opciones" hay traducción, identificar quién habla, y más.' },
+    { icon: '💬', title: 'Chat', text: 'Conversación de ida y vuelta: escuchá a la otra persona y escribí tu respuesta, que se lee en voz alta.' },
+    { icon: '🗣️', title: 'Hablar', text: 'Frases rápidas con pictogramas para decir en voz alta. Podés agregar las tuyas propias.' },
+    { icon: '🔔', title: 'Sonidos', text: 'Detecta timbres, alarmas, sirenas, bebés llorando y más — vibra y avisa aunque no mires la pantalla.' },
+    { icon: '⚙️', title: 'Ajustes y emergencia', text: 'El engranaje (⚙️) tiene toda la configuración general. El 🆘 manda tu ubicación a un contacto. El 👋 explica rápido a un desconocido que sos sordo/a.' },
+  ];
+  let tutorialIndex = 0;
+
+  function renderTutorialSlide() {
+    const slide = TUTORIAL_SLIDES[tutorialIndex];
+    document.getElementById('tutorialIcon').textContent = slide.icon;
+    document.getElementById('tutorialTitle').textContent = slide.title;
+    document.getElementById('tutorialText').textContent = slide.text;
+    document.getElementById('tutorialBackBtn').style.visibility = tutorialIndex === 0 ? 'hidden' : 'visible';
+    document.getElementById('tutorialNextBtn').textContent = tutorialIndex === TUTORIAL_SLIDES.length - 1 ? '¡Empezar!' : 'Siguiente';
+    const dots = document.getElementById('tutorialDots');
+    dots.innerHTML = '';
+    TUTORIAL_SLIDES.forEach((_, i) => {
+      const dot = document.createElement('div');
+      dot.className = 'tutorial-dot' + (i === tutorialIndex ? ' active' : '');
+      dots.appendChild(dot);
+    });
+  }
+
+  function openTutorial() {
+    tutorialIndex = 0;
+    renderTutorialSlide();
+    document.getElementById('tutorialView').style.display = 'flex';
+  }
+
+  function tutorialNext() {
+    if (tutorialIndex < TUTORIAL_SLIDES.length - 1) {
+      tutorialIndex++;
+      renderTutorialSlide();
+    } else {
+      skipTutorial();
+    }
+  }
+
+  function tutorialBack() {
+    if (tutorialIndex > 0) {
+      tutorialIndex--;
+      renderTutorialSlide();
+    }
+  }
+
+  function skipTutorial() {
+    document.getElementById('tutorialView').style.display = 'none';
+    try { localStorage.setItem(TUTORIAL_SEEN_KEY, '1'); } catch (err) {}
+  }
+
+  // Se muestra solo la primera vez, con un pequeño respiro para no chocar con otros avisos iniciales
+  if (!localStorage.getItem(TUTORIAL_SEEN_KEY)) {
+    setTimeout(openTutorial, 600);
   }
 
   function openSettingsView() {
