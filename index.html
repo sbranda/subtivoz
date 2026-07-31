@@ -88,9 +88,10 @@
     gap: 14px;
     box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
     transform: translateY(100%);
-    transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), bottom 0.3s ease;
+    visibility: hidden;
+    transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), bottom 0.3s ease, visibility 0s linear 0.4s;
   }
-  .install-banner.show { transform: translateY(0); }
+  .install-banner.show { transform: translateY(0); visibility: visible; transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), bottom 0.3s ease; }
   .install-banner-text { flex: 1; }
   .install-banner-text strong { display: block; font-size: 15px; font-weight: 700; }
   .install-banner-text span { font-size: 12px; opacity: 0.8; }
@@ -548,6 +549,13 @@
     background: var(--card); border: 1px solid var(--border); border-radius: 10px;
   }
   .font-label { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+  .stepper-btn {
+    width: 44px; height: 44px; min-width: 44px; border-radius: 50%; flex-shrink: 0;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-size: 20px; font-weight: 700; cursor: pointer; touch-action: manipulation;
+    display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1;
+  }
+  .stepper-btn:active { background: rgba(0,229,255,0.15); border-color: var(--accent); color: var(--accent); }
   .font-slider {
     flex: 1; -webkit-appearance: none; appearance: none;
     height: 4px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer;
@@ -1027,9 +1035,9 @@
     <div class="logo-text">Subti<span>Voz</span></div>
   </div>
   <div class="header-right">
-    <button id="settingsBtn" onclick="openSettingsView()" title="Ajustes">⚙️</button>
-    <button id="strangerBtn" onclick="openStrangerMode()" title="Explicar a un desconocido">👋</button>
-    <button id="sosBtn" onclick="triggerEmergency()" title="Emergencia">🆘</button>
+    <button id="settingsBtn" onclick="openSettingsView()" title="Ajustes" aria-label="Abrir ajustes">⚙️</button>
+    <button id="strangerBtn" onclick="openStrangerMode()" title="Explicar a un desconocido" aria-label="Abrir modo explicar a un desconocido">👋</button>
+    <button id="sosBtn" onclick="triggerEmergency()" title="Emergencia" aria-label="Enviar mensaje de emergencia">🆘</button>
     <div class="status-pill idle" id="statusPill">
       <div class="dot"></div>
       <span id="statusText">Listo</span>
@@ -1092,7 +1100,7 @@
       </div>
 
       <div class="subtitle-scroll" id="subtitleScroll">
-        <div class="subtitle-history" id="subtitleHistory"></div>
+        <div class="subtitle-history" id="subtitleHistory" aria-live="polite" aria-atomic="false"></div>
 
         <div class="current-subtitle" id="currentSubtitle">
           <span class="speaker-tag speaker-1" id="liveSpeakerTag" style="display:none;">Persona 1</span>
@@ -1111,7 +1119,9 @@
 <div class="controls">
   <div class="font-control">
     <span class="font-label">Tamaño</span>
+    <button class="stepper-btn" onclick="stepSlider('fontSlider', -2)" aria-label="Achicar letra">−</button>
     <input type="range" class="font-slider" id="fontSlider" min="18" max="56" value="28">
+    <button class="stepper-btn" onclick="stepSlider('fontSlider', 2)" aria-label="Agrandar letra">+</button>
     <span class="font-value" id="fontValue">28px</span>
   </div>
 
@@ -1193,7 +1203,9 @@
     </div>
     <div class="translate-target-row" id="pausedReadingDelayRow">
       <span class="font-label">Pausa entre frases</span>
+      <button class="stepper-btn" onclick="stepSlider('pausedReadingDelaySlider', -1)" aria-label="Menos pausa">−</button>
       <input type="range" class="font-slider" id="pausedReadingDelaySlider" min="1" max="8" value="3" style="flex:1;">
+      <button class="stepper-btn" onclick="stepSlider('pausedReadingDelaySlider', 1)" aria-label="Más pausa">+</button>
       <span class="font-value" id="pausedReadingDelayValue">3s</span>
     </div>
 
@@ -1390,7 +1402,7 @@
       <div class="sound-card" id="cardSirenGeneric"><div class="sound-icon">🔊</div><div class="sound-name">Sirena genérica</div></div>
     </div>
     <div class="sound-disclaimer">⚠️ El micrófono no puede detectar gas en el aire — solo reconoce el <strong>sonido de una alarma</strong> si ya tenés un detector instalado.</div>
-    <div class="sound-history" id="soundHistory"></div>
+    <div class="sound-history" id="soundHistory" aria-live="polite" aria-atomic="false"></div>
   </div>
 
   <div class="controls">
@@ -1423,7 +1435,7 @@
 </div>
 
 <div id="chatView" style="display:none; flex-direction:column; flex:1; min-height:0;">
-  <div class="chat-messages" id="chatMessages">
+  <div class="chat-messages" id="chatMessages" aria-live="polite" aria-atomic="false">
     <div class="chat-empty" id="chatEmpty">💬 Tocá el micrófono para escuchar a la otra persona, o escribí tu respuesta abajo.</div>
   </div>
   <div class="chat-status" id="chatStatus"></div>
@@ -2313,6 +2325,16 @@
     const historyFontSize = currentFontSize + 'px';
     document.querySelectorAll('.history-line').forEach(el => el.style.fontSize = historyFontSize);
   });
+
+  // Botones +/- para quien no puede arrastrar el control deslizante con precisión (temblores, motricidad reducida)
+  function stepSlider(sliderId, delta) {
+    const slider = document.getElementById(sliderId);
+    const min = parseInt(slider.min, 10);
+    const max = parseInt(slider.max, 10);
+    const newValue = Math.max(min, Math.min(max, parseInt(slider.value, 10) + delta));
+    slider.value = newValue;
+    slider.dispatchEvent(new Event('input'));
+  }
 
   function scrollSubtitlesToBottom() {
     if (scrollSubtitlesToBottom._t) return;
