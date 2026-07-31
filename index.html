@@ -130,7 +130,14 @@
     flex-shrink: 0;
   }
 
-  .header-right { display: flex; align-items: center; gap: 10px; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  #strangerBtn {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(0,229,255,0.12); border: 1px solid rgba(0,229,255,0.4);
+    color: var(--accent); font-size: 17px; cursor: pointer; touch-action: manipulation;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #strangerBtn:active { background: rgba(0,229,255,0.25); }
   #sosBtn {
     width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
     background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.5);
@@ -731,6 +738,36 @@
   .modal-actions .btn-secondary { flex: 1; }
   .modal-actions .main-btn { flex: 1; padding: 12px; font-size: 14px; }
 
+  /* ── MODO "EXPLICAR A UN DESCONOCIDO" ── */
+  #strangerView {
+    display: none; position: fixed; inset: 0; z-index: 980;
+    background: var(--bg); flex-direction: column;
+    padding: calc(20px + var(--safe-top)) 20px calc(20px + var(--safe-bottom));
+  }
+  #closeStrangerBtn {
+    position: absolute; top: calc(16px + var(--safe-top)); right: 16px;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    font-size: 20px; cursor: pointer; touch-action: manipulation; z-index: 1;
+  }
+  .stranger-content {
+    flex: 1; display: flex; flex-direction: column; gap: 14px;
+    padding-top: 50px; min-height: 0;
+  }
+  .stranger-heading {
+    font-size: 32px; font-weight: 800; text-align: center; color: var(--accent);
+  }
+  .stranger-subheading {
+    font-size: 16px; text-align: center; color: var(--muted); margin-bottom: 4px;
+  }
+  .stranger-textarea {
+    flex: 1; min-height: 200px; width: 100%;
+    background: var(--card); border: 2px solid var(--accent); border-radius: 16px;
+    padding: 16px; color: var(--text); font-family: var(--font-main);
+    font-size: 26px; font-weight: 600; line-height: 1.4;
+    resize: none; outline: none;
+  }
+
   /* ── SESSION HISTORY ── */
   #historyView {
     display: none; position: fixed; inset: 0; z-index: 900;
@@ -906,6 +943,7 @@
     <div class="logo-text">Subti<span>Voz</span></div>
   </div>
   <div class="header-right">
+    <button id="strangerBtn" onclick="openStrangerMode()" title="Explicar a un desconocido">👋</button>
     <button id="sosBtn" onclick="triggerEmergency()" title="Emergencia">🆘</button>
     <div class="status-pill idle" id="statusPill">
       <div class="dot"></div>
@@ -1314,6 +1352,16 @@
     </div>
   </div>
   <div class="history-list" id="historyList"></div>
+</div>
+
+<div id="strangerView" style="display:none;">
+  <button id="closeStrangerBtn" onclick="closeStrangerMode()" aria-label="Cerrar">✕</button>
+  <div class="stranger-content">
+    <div class="stranger-heading">🖐️ Soy sordo/a</div>
+    <div class="stranger-subheading">Por favor, escribime tu mensaje acá abajo:</div>
+    <textarea id="strangerInput" class="stranger-textarea" placeholder="Escribí acá..." autocomplete="off"></textarea>
+    <button class="btn-secondary" style="width:100%;" onclick="document.getElementById('strangerInput').value=''; document.getElementById('strangerInput').focus();">🗑️ Borrar y escribir de nuevo</button>
+  </div>
 </div>
 
 <div id="cameraView" style="display:none;">
@@ -1832,6 +1880,16 @@
   }
 
   renderCustomPhraseCards();
+
+  function openStrangerMode() {
+    document.getElementById('strangerInput').value = '';
+    document.getElementById('strangerView').style.display = 'flex';
+    setTimeout(() => document.getElementById('strangerInput').focus(), 200);
+  }
+
+  function closeStrangerMode() {
+    document.getElementById('strangerView').style.display = 'none';
+  }
 
   function triggerEmergency() {
     const contact = getEmergencyContact();
