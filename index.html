@@ -756,11 +756,19 @@
   }
 
   /* ── EMERGENCY CONTACT MODAL (y otros modales con el mismo patrón) ── */
-  #emergencyConfigModal, #addPhraseModal, #keywordModal, #speakerTagModal {
+  #emergencyConfigModal, #addPhraseModal, #keywordModal, #speakerTagModal, #statsModal {
     position: fixed; inset: 0; z-index: 950;
     background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
     display: flex; align-items: center; justify-content: center; padding: 24px;
   }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 8px; }
+  .stats-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px; text-align: center;
+  }
+  .stats-number { font-size: 20px; font-weight: 800; color: var(--accent); font-family: 'Space Mono', monospace; }
+  .stats-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
   .modal-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
     padding: 20px; width: 100%; max-width: 340px;
@@ -1181,6 +1189,8 @@
 
     <button class="btn-secondary" style="width:100%;" onclick="openHistoryView()">🕘 Historial de sesiones</button>
 
+    <button class="btn-secondary" style="width:100%;" onclick="openStatsView()">📈 Ver estadísticas de uso</button>
+
     <button class="btn-secondary" style="width:100%;" onclick="downloadSubtitles()">⬇️ Descargar subtítulos (.txt)</button>
 
     <button class="btn-secondary" style="width:100%;" onclick="openEmergencyConfig()">🆘 Configurar contacto de emergencia</button>
@@ -1557,6 +1567,17 @@
   </div>
 </div>
 
+<div id="statsModal" style="display:none;">
+  <div class="modal-card">
+    <h3>📈 Estadísticas de uso</h3>
+    <p class="modal-hint">Guardado solo en tu teléfono — nadie más lo ve.</p>
+    <div id="statsContent"></div>
+    <div class="modal-actions">
+      <button class="main-btn btn-start" onclick="closeStatsView()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1641,6 +1662,85 @@
   let finalTranscript = '';
   let allText = '';
   let startTime = null;
+  let sessionListenStartTime = null;
+  let sessionSoundStartTime = null;
+
+  // ── Estadísticas simples de uso (guardadas por día, en el teléfono)
+  const STATS_KEY = 'subtivoz_stats';
+
+  function todayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function getStats() {
+    try { return JSON.parse(localStorage.getItem(STATS_KEY) || '{}'); }
+    catch (err) { return {}; }
+  }
+
+  function incrementStat(field, amount) {
+    amount = amount || 1;
+    const stats = getStats();
+    const key = todayKey();
+    if (!stats[key]) stats[key] = {};
+    stats[key][field] = (stats[key][field] || 0) + amount;
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); }
+    catch (err) { /* si se llena el storage, no pasa nada grave */ }
+  }
+
+  function getStatsSummary(days) {
+    const stats = getStats();
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - (days - 1));
+    const summary = { listenSeconds: 0, soundSeconds: 0, translations: 0, spokenPhrases: 0, chatMessages: 0 };
+    Object.keys(stats).forEach(dateKey => {
+      const d = new Date(dateKey + 'T00:00:00');
+      if (d >= cutoff) {
+        Object.keys(summary).forEach(field => { summary[field] += stats[dateKey][field] || 0; });
+      }
+    });
+    return summary;
+  }
+
+  function formatHoursMinutes(totalSeconds) {
+    const totalMinutes = Math.round(totalSeconds / 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (h === 0 && m === 0) return '0 min';
+    if (h === 0) return m + ' min';
+    if (m === 0) return h + ' h';
+    return h + ' h ' + m + ' min';
+  }
+
+  function openStatsView() {
+    const weekStats = getStatsSummary(7);
+    const allStats = getStatsSummary(36500); // ~"todo el historial"
+    document.getElementById('statsContent').innerHTML = `
+      <div class="phrase-group-label">Esta semana</div>
+      <div class="stats-grid">
+        <div class="stats-card"><div class="stats-number">${formatHoursMinutes(weekStats.listenSeconds)}</div><div class="stats-label">🎙️ Subtítulos usados</div></div>
+        <div class="stats-card"><div class="stats-number">${formatHoursMinutes(weekStats.soundSeconds)}</div><div class="stats-label">🔔 Sonidos escuchando</div></div>
+        <div class="stats-card"><div class="stats-number">${weekStats.translations}</div><div class="stats-label">🌐 Frases traducidas</div></div>
+        <div class="stats-card"><div class="stats-number">${weekStats.spokenPhrases}</div><div class="stats-label">🗣️ Frases dichas</div></div>
+        <div class="stats-card"><div class="stats-number">${weekStats.chatMessages}</div><div class="stats-label">💬 Mensajes de chat</div></div>
+      </div>
+      <div class="phrase-group-label">Desde que empezaste a usar la app</div>
+      <div class="stats-grid">
+        <div class="stats-card"><div class="stats-number">${formatHoursMinutes(allStats.listenSeconds)}</div><div class="stats-label">🎙️ Subtítulos usados</div></div>
+        <div class="stats-card"><div class="stats-number">${formatHoursMinutes(allStats.soundSeconds)}</div><div class="stats-label">🔔 Sonidos escuchando</div></div>
+        <div class="stats-card"><div class="stats-number">${allStats.translations}</div><div class="stats-label">🌐 Frases traducidas</div></div>
+        <div class="stats-card"><div class="stats-number">${allStats.spokenPhrases}</div><div class="stats-label">🗣️ Frases dichas</div></div>
+        <div class="stats-card"><div class="stats-number">${allStats.chatMessages}</div><div class="stats-label">💬 Mensajes de chat</div></div>
+      </div>
+    `;
+    document.getElementById('statsModal').style.display = 'flex';
+  }
+
+  function closeStatsView() {
+    document.getElementById('statsModal').style.display = 'none';
+  }
+
   let timerInterval = null;
   let wordCount = 0;
   let currentFontSize = 28;
@@ -2445,6 +2545,7 @@
     isListening = true;
     lastFinalChunk = '';
     lastFinalChunkTime = 0;
+    sessionListenStartTime = Date.now();
     try { recognition.start(); } catch(e) { showToast('Error al iniciar micrófono'); isListening = false; return; }
     checkBatteryWarning();
     startRecognitionWatchdog();
@@ -2463,6 +2564,10 @@
     stopVolumeMeter();
     stopCaptionTagDetection();
     if (ambientEnabled) startAmbientMeter();
+    if (sessionListenStartTime) {
+      incrementStat('listenSeconds', Math.round((Date.now() - sessionListenStartTime) / 1000));
+      sessionListenStartTime = null;
+    }
     clearInterval(timerInterval);
     setStatus('idle');
     document.getElementById('waveform').classList.remove('active');
@@ -2544,6 +2649,7 @@
   }
 
   async function translateLine(text, sourceLang, targetLang, targetEl) {
+    incrementStat('translations');
     try {
       const params = new URLSearchParams({ q: text, langpair: `${sourceLang}|${targetLang}` });
       const res = await fetch(`https://api.mymemory.translated.net/get?${params}`);
@@ -2728,6 +2834,7 @@
 
   function logSpokenPhrase(text) {
     if (!text || !text.trim()) return;
+    incrementStat('spokenPhrases');
     if (!speakSessionId) speakSessionId = Date.now();
 
     const empty = document.getElementById('speakLogEmpty');
@@ -3377,6 +3484,7 @@
 
   function addChatBubble(text, sender) {
     if (!text.trim()) return;
+    incrementStat('chatMessages');
     const empty = document.getElementById('chatEmpty');
     if (empty) empty.remove();
     if (!chatSessionId) chatSessionId = Date.now();
@@ -3957,6 +4065,7 @@
       silentGain.connect(soundAudioCtx.destination);
 
       isSoundDetecting = true;
+      sessionSoundStartTime = Date.now();
       checkBatteryWarning();
       if (keywordAlertEnabled) startKeywordRecognition();
       btn.disabled = false;
@@ -3977,6 +4086,10 @@
   function stopSoundDetection() {
     isSoundDetecting = false;
     stopKeywordRecognition();
+    if (sessionSoundStartTime) {
+      incrementStat('soundSeconds', Math.round((Date.now() - sessionSoundStartTime) / 1000));
+      sessionSoundStartTime = null;
+    }
     if (soundProcessor) { soundProcessor.onaudioprocess = null; soundProcessor.disconnect(); }
     if (soundSource) soundSource.disconnect();
     if (soundStream) soundStream.getTracks().forEach(t => t.stop());
