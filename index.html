@@ -1589,6 +1589,33 @@
   let lastFinalChunkTime = 0;
   const TURN_PAUSE_MS = 1200; // gap that counts as a possible speaker change
 
+  // ── Vigilante del micrófono: detecta si el reconocimiento se quedó "colgado" en silencio
+  let lastRecognitionActivity = null;
+  let recognitionWatchdogInterval = null;
+  let micStalledWarningShown = false;
+  const MIC_STALL_THRESHOLD_MS = 20000; // sin ningún onstart/onresult en 20s = algo anda mal
+
+  function startRecognitionWatchdog() {
+    lastRecognitionActivity = Date.now();
+    micStalledWarningShown = false;
+    if (recognitionWatchdogInterval) clearInterval(recognitionWatchdogInterval);
+    recognitionWatchdogInterval = setInterval(() => {
+      if (!isListening) return;
+      const silentFor = Date.now() - lastRecognitionActivity;
+      if (silentFor > MIC_STALL_THRESHOLD_MS && !micStalledWarningShown) {
+        micStalledWarningShown = true;
+        showToast('⚠️ El micrófono parece haberse detenido — revisá que otra app no lo esté usando');
+        // Intento de recuperación automática, por si el reinicio interno se había frenado
+        try { if (recognition) recognition.stop(); } catch (e) {}
+        try { if (recognition) recognition.start(); } catch (e) {}
+      }
+    }, 5000);
+  }
+
+  function stopRecognitionWatchdog() {
+    if (recognitionWatchdogInterval) { clearInterval(recognitionWatchdogInterval); recognitionWatchdogInterval = null; }
+  }
+
   const speakerToggle = document.getElementById('speakerToggle');
   speakerToggle.addEventListener('change', () => {
     speakerIdEnabled = speakerToggle.checked;
@@ -1970,6 +1997,8 @@
     recognition.lang = document.getElementById('langSelect').value;
 
     recognition.onstart = () => {
+      lastRecognitionActivity = Date.now();
+      micStalledWarningShown = false;
       setStatus('listening');
       document.getElementById('placeholder').style.opacity = '0';
       document.getElementById('waveform').classList.add('active');
@@ -1984,6 +2013,8 @@
     };
 
     recognition.onresult = (event) => {
+      lastRecognitionActivity = Date.now();
+      micStalledWarningShown = false;
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const t = applyDictionary(event.results[i][0].transcript);
@@ -2059,7 +2090,12 @@
 
     recognition.onend = () => {
       if (isListening) {
-        try { recognition.start(); } catch(err) {}
+        try {
+          recognition.start();
+        } catch(err) {
+          // El reinicio falló de verdad (por ejemplo, otra app agarró el micrófono).
+          // No lo silenciamos: el vigilante de abajo se va a encargar de avisar y reintentar.
+        }
       }
     };
 
@@ -2137,6 +2173,7 @@
     lastFinalChunkTime = 0;
     try { recognition.start(); } catch(e) { showToast('Error al iniciar micrófono'); isListening = false; return; }
     checkBatteryWarning();
+    startRecognitionWatchdog();
     if (isMeterEnabled) startVolumeMeter();
     if (isCaptionTagsEnabled) startCaptionTagDetection();
     if (!currentSessionId) currentSessionId = Date.now();
@@ -2147,6 +2184,7 @@
 
   function stopRecognition() {
     isListening = false;
+    stopRecognitionWatchdog();
     if (recognition) { try { recognition.stop(); } catch(e){} }
     stopVolumeMeter();
     stopCaptionTagDetection();
