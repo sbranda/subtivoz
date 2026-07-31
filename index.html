@@ -493,6 +493,10 @@
   .speaker-tag.speaker-3 { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.4); }
   .speaker-tag.speaker-4 { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.4); }
 
+  .speaker-options { display: flex; flex-wrap: wrap; gap: 8px; }
+  .speaker-option-btn { flex: 1; min-width: 45%; }
+  .speaker-option-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.1); }
+
   .current-subtitle {
     font-size: 28px; font-weight: 700; line-height: 1.3;
     color: var(--accent); letter-spacing: -0.3px;
@@ -731,8 +735,8 @@
   body.hc #fullscreenView { background: #000; }
   body.hc #fullscreenText { font-size: clamp(40px, 12vw, 120px); }
 
-  /* ── EMERGENCY CONTACT MODAL ── */
-  #emergencyConfigModal {
+  /* ── EMERGENCY CONTACT MODAL (y otros modales con el mismo patrón) ── */
+  #emergencyConfigModal, #addPhraseModal, #keywordModal, #speakerTagModal {
     position: fixed; inset: 0; z-index: 950;
     background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
     display: flex; align-items: center; justify-content: center; padding: 24px;
@@ -1496,6 +1500,21 @@
   </div>
 </div>
 
+<div id="speakerTagModal" style="display:none;">
+  <div class="modal-card">
+    <h3>👥 Hablante de esta línea</h3>
+    <p class="modal-hint">Tocá cuál de estas personas dijo esta frase, o ponele un nombre real a la que está seleccionada.</p>
+    <div class="speaker-options" id="speakerTagOptions"></div>
+    <label class="modal-label">Nombre real (opcional)</label>
+    <input type="text" id="speakerNameInput" placeholder="Ej: Dra. González">
+    <p class="modal-hint">El nombre se aplica a todas las líneas de esa persona en esta conversación, no solo a esta.</p>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSpeakerTagModal()">Cerrar</button>
+      <button class="main-btn btn-start" onclick="saveSpeakerName()">💾 Guardar nombre</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1649,6 +1668,56 @@
   let lastFinalChunk = '';
   let lastFinalChunkTime = 0;
   const TURN_PAUSE_MS = 1200; // gap that counts as a possible speaker change
+  let speakerNames = { 1: null, 2: null, 3: null, 4: null }; // nombres reales, opcionales, por número de hablante
+
+  function speakerDisplayName(num) {
+    return speakerNames[num] || ('Persona ' + num);
+  }
+
+  let activeSpeakerTagEl = null;
+
+  function openSpeakerTagModal(tagEl) {
+    activeSpeakerTagEl = tagEl;
+    const currentNum = parseInt(tagEl.dataset.speaker, 10);
+    const optionsDiv = document.getElementById('speakerTagOptions');
+    optionsDiv.innerHTML = '';
+    for (let n = 1; n <= 4; n++) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-secondary speaker-option-btn' + (n === currentNum ? ' selected' : '');
+      btn.textContent = speakerDisplayName(n);
+      btn.onclick = () => {
+        activeSpeakerTagEl.dataset.speaker = n;
+        activeSpeakerTagEl.className = 'speaker-tag speaker-' + n;
+        activeSpeakerTagEl.textContent = speakerDisplayName(n);
+        document.getElementById('speakerNameInput').value = speakerNames[n] || '';
+        openSpeakerTagModal(activeSpeakerTagEl); // re-renderiza para marcar el nuevo seleccionado
+      };
+      optionsDiv.appendChild(btn);
+    }
+    document.getElementById('speakerNameInput').value = speakerNames[currentNum] || '';
+    document.getElementById('speakerTagModal').style.display = 'flex';
+  }
+
+  function closeSpeakerTagModal() {
+    document.getElementById('speakerTagModal').style.display = 'none';
+    activeSpeakerTagEl = null;
+  }
+
+  function saveSpeakerName() {
+    if (!activeSpeakerTagEl) return;
+    const num = parseInt(activeSpeakerTagEl.dataset.speaker, 10);
+    const name = document.getElementById('speakerNameInput').value.trim();
+    speakerNames[num] = name || null;
+
+    // Actualiza TODAS las etiquetas ya escritas con ese mismo número, no solo esta línea
+    document.querySelectorAll('.speaker-tag.speaker-' + num).forEach(el => {
+      el.textContent = speakerDisplayName(num);
+    });
+    if (currentSpeakerNum === num) updateLiveSpeakerTag();
+
+    closeSpeakerTagModal();
+    showToast(name ? '✅ Nombre guardado' : '↺ Nombre quitado');
+  }
 
   // ── Vigilante del micrófono: detecta si el reconocimiento se quedó "colgado" en silencio
   let lastRecognitionActivity = null;
@@ -1687,7 +1756,7 @@
     const tag = document.getElementById('liveSpeakerTag');
     if (!speakerIdEnabled) { tag.style.display = 'none'; return; }
     tag.className = 'speaker-tag speaker-' + currentSpeakerNum;
-    tag.textContent = 'Persona ' + currentSpeakerNum;
+    tag.textContent = speakerDisplayName(currentSpeakerNum);
     tag.style.display = 'inline-block';
   }
 
@@ -2348,16 +2417,12 @@
     if (speakerIdEnabled && speakerNum) {
       const tag = document.createElement('span');
       tag.className = 'speaker-tag speaker-' + speakerNum;
-      tag.textContent = 'Persona ' + speakerNum;
+      tag.textContent = speakerDisplayName(speakerNum);
       tag.dataset.speaker = speakerNum;
-      tag.title = 'Toca para corregir';
+      tag.title = 'Toca para corregir o ponerle nombre';
       tag.onclick = (e) => {
         e.stopPropagation();
-        let n = parseInt(tag.dataset.speaker, 10);
-        n = n >= 4 ? 1 : n + 1;
-        tag.dataset.speaker = n;
-        tag.className = 'speaker-tag speaker-' + n;
-        tag.textContent = 'Persona ' + n;
+        openSpeakerTagModal(tag);
       };
       line.appendChild(tag);
       line.appendChild(document.createTextNode(' ' + text.trim()));
@@ -2748,6 +2813,7 @@
     finalTranscript = ''; allText = ''; wordCount = 0;
     currentSpeakerNum = 1;
     lastFinalEndTime = null;
+    speakerNames = { 1: null, 2: null, 3: null, 4: null };
     updateLiveSpeakerTag();
     // Si había una sesión en curso guardada, la borramos y empieza una nueva
     if (currentSessionId) {
