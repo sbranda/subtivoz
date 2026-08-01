@@ -775,7 +775,7 @@
   }
 
   /* ── EMERGENCY CONTACT MODAL (y otros modales con el mismo patrón) ── */
-  #emergencyConfigModal, #addPhraseModal, #keywordModal, #speakerTagModal, #statsModal {
+  #emergencyConfigModal, #addPhraseModal, #keywordModal, #speakerTagModal, #statsModal, #interpreterContactsModal, #interpreterRequestModal {
     position: fixed; inset: 0; z-index: 950;
     background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
     display: flex; align-items: center; justify-content: center; padding: 24px;
@@ -1269,6 +1269,13 @@
   <div class="settings-content">
     <button class="btn-secondary" style="width:100%;" onclick="openTutorial()">🎓 Ver el tutorial de bienvenida</button>
 
+    <div class="dictionary-section">
+      <div class="phrase-group-label">🧏 Intérprete LSA</div>
+      <div class="dictionary-hint">Guardá contactos de intérpretes (INADI, tu municipio, privados) y armá el mensaje para pedir turno en segundos.</div>
+      <button class="btn-secondary" style="width:100%;" onclick="openInterpreterContactsModal()">📇 Gestionar contactos</button>
+      <button class="btn-secondary" style="width:100%;" onclick="openInterpreterRequestModal()">📅 Solicitar turno</button>
+    </div>
+
     <button class="btn-secondary" style="width:100%;" onclick="openHistoryView()">🕘 Historial de sesiones</button>
 
     <button class="btn-secondary" style="width:100%;" onclick="openStatsView()">📈 Ver estadísticas de uso</button>
@@ -1670,6 +1677,52 @@
     <div id="statsContent"></div>
     <div class="modal-actions">
       <button class="main-btn btn-start" onclick="closeStatsView()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="interpreterContactsModal" style="display:none;">
+  <div class="modal-card">
+    <h3>📇 Contactos de intérprete LSA</h3>
+    <label class="modal-label">Nombre del servicio</label>
+    <input type="text" id="interpNameInput" placeholder="Ej: INADI Nacional, Municipio, ULSA...">
+    <label class="modal-label">Teléfono / WhatsApp (opcional)</label>
+    <input type="tel" id="interpPhoneInput" placeholder="Ej: +5491122334455">
+    <label class="modal-label">Mail (opcional)</label>
+    <input type="email" id="interpEmailInput" placeholder="Ej: contacto@ejemplo.gob.ar">
+    <label class="modal-label">Nota (opcional)</label>
+    <input type="text" id="interpNoteInput" placeholder="Ej: pedir con 1 semana de anticipación">
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeInterpreterContactsModal()">Cerrar</button>
+      <button class="main-btn btn-start" onclick="addInterpreterContact()">➕ Agregar</button>
+    </div>
+    <div class="phrase-group-label" style="margin-top:6px;">Contactos guardados</div>
+    <div class="dictionary-list" id="interpreterContactsList"></div>
+  </div>
+</div>
+
+<div id="interpreterRequestModal" style="display:none;">
+  <div class="modal-card">
+    <h3>📅 Solicitar turno con intérprete</h3>
+    <label class="modal-label">Contacto</label>
+    <select class="lang-select" id="interpContactSelect" style="width:100%;"></select>
+
+    <label class="modal-label">Tus datos (se guardan para la próxima vez)</label>
+    <input type="text" id="interpMyName" placeholder="Tu nombre">
+    <input type="text" id="interpMyContact" placeholder="Tu teléfono o mail de contacto">
+
+    <label class="modal-label">Fecha y hora que necesitás</label>
+    <input type="text" id="interpDate" placeholder="Ej: martes 12 de agosto, 10 hs">
+
+    <label class="modal-label">Motivo</label>
+    <input type="text" id="interpReason" placeholder="Ej: consulta médica, trámite...">
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeInterpreterRequestModal()">Cerrar</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" style="flex:1;" onclick="sendInterpreterRequest('whatsapp')">📱 WhatsApp</button>
+      <button class="btn-secondary" style="flex:1;" onclick="sendInterpreterRequest('mail')">📧 Mail</button>
     </div>
   </div>
 </div>
@@ -3043,6 +3096,131 @@
       dot.className = 'tutorial-dot' + (i === tutorialIndex ? ' active' : '');
       dots.appendChild(dot);
     });
+  }
+
+  // ── Intérprete LSA: agenda de contactos + plantilla para pedir turno
+  const INTERPRETER_CONTACTS_KEY = 'subtivoz_interpreter_contacts';
+  const INTERPRETER_MYINFO_KEY = 'subtivoz_interpreter_myinfo';
+
+  function getInterpreterContacts() {
+    try { return JSON.parse(localStorage.getItem(INTERPRETER_CONTACTS_KEY) || '[]'); }
+    catch (err) { return []; }
+  }
+
+  function saveInterpreterContacts(list) {
+    try { localStorage.setItem(INTERPRETER_CONTACTS_KEY, JSON.stringify(list)); }
+    catch (err) { console.error('No se pudieron guardar los contactos:', err); }
+  }
+
+  function getInterpreterMyInfo() {
+    try { return JSON.parse(localStorage.getItem(INTERPRETER_MYINFO_KEY) || '{}'); }
+    catch (err) { return {}; }
+  }
+
+  function saveInterpreterMyInfo(info) {
+    try { localStorage.setItem(INTERPRETER_MYINFO_KEY, JSON.stringify(info)); }
+    catch (err) { console.error('No se pudieron guardar tus datos:', err); }
+  }
+
+  function openInterpreterContactsModal() {
+    renderInterpreterContactsList();
+    document.getElementById('interpreterContactsModal').style.display = 'flex';
+  }
+
+  function closeInterpreterContactsModal() {
+    document.getElementById('interpreterContactsModal').style.display = 'none';
+  }
+
+  function addInterpreterContact() {
+    const nombre = document.getElementById('interpNameInput').value.trim();
+    const telefono = document.getElementById('interpPhoneInput').value.trim();
+    const email = document.getElementById('interpEmailInput').value.trim();
+    const nota = document.getElementById('interpNoteInput').value.trim();
+    if (!nombre) { showToast('⚠️ Ponele un nombre al contacto'); return; }
+    if (!telefono && !email) { showToast('⚠️ Cargá al menos un teléfono o un mail'); return; }
+
+    const list = getInterpreterContacts();
+    list.push({ id: Date.now(), nombre, telefono, email, nota });
+    saveInterpreterContacts(list);
+    renderInterpreterContactsList();
+    document.getElementById('interpNameInput').value = '';
+    document.getElementById('interpPhoneInput').value = '';
+    document.getElementById('interpEmailInput').value = '';
+    document.getElementById('interpNoteInput').value = '';
+    showToast('✅ Contacto agregado');
+  }
+
+  function deleteInterpreterContact(id) {
+    saveInterpreterContacts(getInterpreterContacts().filter(c => c.id !== id));
+    renderInterpreterContactsList();
+  }
+
+  function renderInterpreterContactsList() {
+    const list = getInterpreterContacts();
+    const container = document.getElementById('interpreterContactsList');
+    if (!list.length) {
+      container.innerHTML = '<div class="dictionary-empty">Todavía no agregaste ningún contacto.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    list.forEach(c => {
+      const parts = [c.telefono, c.email].filter(Boolean).join(' · ');
+      const row = document.createElement('div');
+      row.className = 'dictionary-entry';
+      row.innerHTML = `<span class="dictionary-entry-text"><strong>${escapeHtml(c.nombre)}</strong>${parts ? ' — ' + escapeHtml(parts) : ''}${c.nota ? ' (' + escapeHtml(c.nota) + ')' : ''}</span><button aria-label="Borrar contacto">🗑️</button>`;
+      row.querySelector('button').onclick = () => deleteInterpreterContact(c.id);
+      container.appendChild(row);
+    });
+  }
+
+  function openInterpreterRequestModal() {
+    const contacts = getInterpreterContacts();
+    if (!contacts.length) {
+      showToast('📇 Primero agregá al menos un contacto');
+      openInterpreterContactsModal();
+      return;
+    }
+    const select = document.getElementById('interpContactSelect');
+    select.innerHTML = contacts.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+
+    const myInfo = getInterpreterMyInfo();
+    document.getElementById('interpMyName').value = myInfo.nombre || '';
+    document.getElementById('interpMyContact').value = myInfo.contacto || '';
+
+    document.getElementById('interpreterRequestModal').style.display = 'flex';
+  }
+
+  function closeInterpreterRequestModal() {
+    document.getElementById('interpreterRequestModal').style.display = 'none';
+  }
+
+  function sendInterpreterRequest(channel) {
+    const contacts = getInterpreterContacts();
+    const contactId = parseInt(document.getElementById('interpContactSelect').value, 10);
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) { showToast('⚠️ Elegí un contacto'); return; }
+
+    const myName = document.getElementById('interpMyName').value.trim();
+    const myContact = document.getElementById('interpMyContact').value.trim();
+    const fecha = document.getElementById('interpDate').value.trim();
+    const motivo = document.getElementById('interpReason').value.trim();
+
+    if (!myName || !myContact) { showToast('⚠️ Completá tus datos'); return; }
+    if (!fecha) { showToast('⚠️ Indicá la fecha y hora que necesitás'); return; }
+
+    saveInterpreterMyInfo({ nombre: myName, contacto: myContact });
+
+    const mensaje = `Hola, mi nombre es ${myName}. Necesito solicitar un intérprete de Lengua de Señas Argentina (LSA) para el ${fecha}${motivo ? ', por el siguiente motivo: ' + motivo : ''}. Mi contacto: ${myContact}. Muchas gracias.`;
+
+    if (channel === 'whatsapp') {
+      if (!contact.telefono) { showToast('⚠️ Este contacto no tiene teléfono cargado'); return; }
+      const digits = contact.telefono.replace(/[^\d+]/g, '');
+      window.open(`https://wa.me/${digits.replace('+', '')}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    } else {
+      if (!contact.email) { showToast('⚠️ Este contacto no tiene mail cargado'); return; }
+      window.location.href = `mailto:${contact.email}?subject=${encodeURIComponent('Solicitud de intérprete LSA')}&body=${encodeURIComponent(mensaje)}`;
+    }
+    closeInterpreterRequestModal();
   }
 
   function openTutorial() {
