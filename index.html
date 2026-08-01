@@ -1331,6 +1331,14 @@
         </div>
       </div>
 
+      <div class="font-control">
+        <span class="font-label">Tamaño de toda la app</span>
+        <button class="stepper-btn" onclick="stepSlider('uiScaleSlider', -10)" aria-label="Achicar toda la interfaz">−</button>
+        <input type="range" class="font-slider" id="uiScaleSlider" min="90" max="140" value="100">
+        <button class="stepper-btn" onclick="stepSlider('uiScaleSlider', 10)" aria-label="Agrandar toda la interfaz">+</button>
+        <span class="font-value" id="uiScaleValue">100%</span>
+      </div>
+
       <button class="btn-secondary" style="width:100%;" onclick="resetAppearance()">↺ Restablecer apariencia</button>
       <div class="version-tag">SubtiVoz · versión 2026-07-06-F (íconos corregidos)</div>
     </div>
@@ -2104,7 +2112,7 @@
     mono: "'Space Mono', monospace"
   };
   const APPEARANCE_KEY = 'subtivoz_appearance';
-  const DEFAULT_APPEARANCE = { font: 'atkinson', accent: '#00e5ff' };
+  const DEFAULT_APPEARANCE = { font: 'atkinson', accent: '#00e5ff', uiScale: 100 };
 
   function loadAppearance() {
     try { return { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem(APPEARANCE_KEY) || '{}') }; }
@@ -2119,8 +2127,11 @@
   function applyAppearance(appearance) {
     document.documentElement.style.setProperty('--font-content', FONT_STACKS[appearance.font] || FONT_STACKS.atkinson);
     document.documentElement.style.setProperty('--accent', appearance.accent);
+    document.body.style.zoom = (appearance.uiScale || 100) / 100;
     document.getElementById('fontFamilySelect').value = appearance.font;
     document.getElementById('customAccentColor').value = appearance.accent;
+    document.getElementById('uiScaleSlider').value = appearance.uiScale || 100;
+    document.getElementById('uiScaleValue').textContent = (appearance.uiScale || 100) + '%';
     document.querySelectorAll('.color-swatch').forEach(sw => {
       sw.classList.toggle('selected', sw.dataset.color.toLowerCase() === appearance.accent.toLowerCase());
     });
@@ -2131,6 +2142,12 @@
 
   document.getElementById('fontFamilySelect').addEventListener('change', (e) => {
     currentAppearance.font = e.target.value;
+    applyAppearance(currentAppearance);
+    saveAppearance(currentAppearance);
+  });
+
+  document.getElementById('uiScaleSlider').addEventListener('input', (e) => {
+    currentAppearance.uiScale = parseInt(e.target.value, 10);
     applyAppearance(currentAppearance);
     saveAppearance(currentAppearance);
   });
